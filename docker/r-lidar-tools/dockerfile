@@ -1,0 +1,24 @@
+
+FROM rocker/r-ver:4.3.1
+
+RUN apt-get update && apt-get install -y \
+    libgdal-dev \
+    libproj-dev \
+    libgeos-dev \
+    libudunits2-dev \
+    libcurl4-openssl-dev \
+    libxml2-dev \
+    libssl-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN R -e "install.packages('lasR', repos = 'https://r-lidar.r-universe.dev')"
+
+
+RUN R -e "install.packages('lidR', repos = 'https://cloud.r-project.org')"
+
+
+WORKDIR /home/rstudio
+
+CMD ["Rscript"]

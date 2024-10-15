@@ -21,6 +21,9 @@ out/
 # Visual Studio, IDE
 .vs
 
+# Docker images
+.img
+
 # Other
 .DS_Store
 desktop.ini

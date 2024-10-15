@@ -1,0 +1,31 @@
+# Singularity definition file
+
+Bootstrap: docker
+From: rocker/r-ver:4.3.1  # Základní obraz obsahující R
+
+%post
+    # Instalace systémových balíčků potřebných pro R
+    apt-get update && apt-get install -y \
+        libgdal-dev \
+        libproj-dev \
+        libgeos-dev \
+        libudunits2-dev \
+        libcurl4-openssl-dev \
+        libxml2-dev \
+        libssl-dev
+
+    # Instalace R balíčků
+    R -e "install.packages('lasR', repos = 'https://r-lidar.r-universe.dev')"
+    R -e "install.packages('lidR', repos = 'https://cloud.r-project.org')"
+
+%environment
+    # Definování proměnných prostředí
+    export PATH=/usr/local/bin:$PATH
+
+%runscript
+    # Co se má spustit, když zavoláte `singularity run`
+    exec Rscript "$@"
+
+%labels
+    Author krucek@vukoz.cz
+    Version 0.1
