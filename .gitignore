@@ -23,6 +23,7 @@ out/
 
 # Docker images
 .img
+.tar
 
 # Other
 .DS_Store
