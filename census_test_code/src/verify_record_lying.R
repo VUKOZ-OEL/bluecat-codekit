@@ -1,0 +1,1 @@
+source("src/global/functions.R", encoding="utf-8", verbose = F)

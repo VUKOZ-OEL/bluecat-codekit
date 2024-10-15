@@ -1,0 +1,1 @@
+Put data template geopackage in this folder.

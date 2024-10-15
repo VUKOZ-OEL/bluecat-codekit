@@ -1,2 +1,2 @@
 # BlueCats-On-R
-BlueCat repository for R code - script development and management 
+BlueCat repository for code - script development and management 

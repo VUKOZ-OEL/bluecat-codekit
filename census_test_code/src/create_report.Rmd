@@ -1,0 +1,91 @@
+---
+title: "Zakova hora report"
+output: html_document
+date: "`r Sys.time()`"
+---
+
+```{r Setup, echo=FALSE }
+knitr::opts_knit$set(root.dir = ROOT.DIR)
+```
+
+```{r, include=FALSE}
+source(paste(ROOT.DIR,"src/global/variables.R", sep ="/"), local = knitr::knit_global())
+source(paste(ROOT.DIR,"src/global/functions.R", sep ="/"), local = knitr::knit_global())
+
+# or sys.source("your-script.R", envir = knitr::knit_global())
+```
+
+```{r Print summary, echo=FALSE }
+
+trees <- get_standing_trees()
+visited <- trees[!is.na(trees[[DBH_NEW.COL]]),]
+progress <- nrow(visited)/nrow(trees)*100
+print(paste("Overall progress:",round(progress,1),"%"), quote = F, right = F)
+
+# trees$err2 <-gsub(" ","",trees[[ERROR.COL]])
+# trees <- trees[nchar(trees$err2) > 4,c(ERROR.COL,"geom")]
+# print(paste("Number of error trees:",nrow(errors)), quote = F, right = F)
+# 
+# error.list <- read.table("workflow/src/error_list.txt")
+# names(error.list) <- c("ERROR")
+# error.list$COUNT <- NA
+# 
+# for(i in 1:nrow(error.list)){
+#   
+#   error <- paste0("\\b", error.list$ERROR[i], "\\b") 
+#   error.list$COUNT[i] <- sum(grepl(error, trees[[ERROR.COL]]))
+#    
+# }
+# 
+# present.errors <- error.list[error.list$COUNT > 0,]
+# 
+# print(present.errors, quote = F, right = F)
+
+
+```
+
+```{r Plot trees, fig.height=8, fig.width=8, echo=FALSE }
+
+#boundary.poly <- get_plot_boundary()
+trees <- get_standing_trees()
+
+trees$color <- NA
+trees$color <- ifelse(trees$crew == "Cerveny", "red", trees$color)
+trees$color <- ifelse(trees$crew == "Duhovy", "violet", trees$color)  
+trees$color <- ifelse(trees$crew == "Modry", "blue3", trees$color)  
+trees$color <- ifelse(trees$crew == "Zeleny", "green", trees$color)  
+trees$color <- ifelse(is.na(trees[[DBH_NEW.COL]]), "grey80", trees$color )
+
+plot(trees$geom, col = trees$color, pch = 16, cex = 0.5)
+#plot(boundary.poly, add = T)
+
+
+
+```
+
+```{r Plot counts, fig.height=8, fig.width=8, echo=FALSE }
+
+# trees <- get_standing_trees()
+# visited <- trees[!is.na(trees[[DBH_NEW.COL]]),]
+# 
+# tree.counts <- as.data.frame(table(visited[[EDIT_BY.COL]]), stringsAsFactors = FALSE)
+# tree.counts$color <- heat.colors(nrow(tree.counts))
+# visited <- merge(visited,tree.counts,by.x = EDIT_BY.COL,by.y = "Var1")
+# 
+# par(mar = c(1, 3, 0.5, 0.5))
+# #par(mar=c(1,1,1,1))
+# barplot(tree.counts$Freq, main="", horiz=TRUE,beside = TRUE, names.arg = tree.counts$Var1,cex.names = 0.5, las = 1,
+#         col = tree.counts$color, cex.axis = 0.6 )
+
+
+```
+
+```{r Print errors, echo=FALSE }
+
+# if(length(error.log) > 0){
+#   print("Present errors in optional part of workflow:")
+#   print(error.log)
+# }
+
+
+```
