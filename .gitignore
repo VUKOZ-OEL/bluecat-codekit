@@ -1,0 +1,26 @@
+# R working environment files
+.Rhistory
+.RData
+
+# RStudio files
+.Rproj.user/
+*.Rproj
+
+# Dependency management
+renv/
+packrat/
+
+# Builds
+bin/
+build/
+out/
+
+# Visual Studio Code, Editor
+.vscode
+
+# Visual Studio, IDE
+.vs
+
+# Other
+.DS_Store
+desktop.ini
