@@ -6,3 +6,6 @@ docker build -t r-lidar-tools .
 docker tag r-lidar-tools yourdockername/r-lidar-tools:latest
 docker push yourdockername/r-lidar-tools:latest
 ```
+
+to run on cesnet: ```singularity exec -B $SCRATCHDIR/:/data ./r-lidar-tools.img Rscript /data/rtest.R```
+
