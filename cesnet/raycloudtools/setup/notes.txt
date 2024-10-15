@@ -1,0 +1,19 @@
+cp /storage/plzen1/home/krucek/ray_processing/singularityfile $SCRATCHDIR
+cd $SCRATCHDIR
+
+singularity build --remote r-lidar-tools.sif singularityfile
+
+docker build -t helios .
+
+cp /storage/plzen1/home/krucek/InterCOST/src/rtest.R $SCRATCHDIR
+cp /storage/plzen1/home/krucek/InterCOST/img/r-lidar-tools.img $SCRATCHDIR
+
+singularity exec -B $SCRATCHDIR/:/data ./r-lidar-tools.img Rscript /data/rtest.R
+
+
+cp /storage/plzen1/home/krucek/InterCOST/src/pdal_pipeline.json $SCRATCHDIR
+cat pdal_pipeline.json
+singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal pipeline /data/pdal_pipeline.json
+
+
+
