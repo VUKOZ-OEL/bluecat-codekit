@@ -1,6 +1,4 @@
-# 
-
 # remove github repo
-rm -r bluecat-codekit
+rm -rf bluecat-codekit
 
 
