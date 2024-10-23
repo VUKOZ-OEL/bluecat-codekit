@@ -17,7 +17,7 @@ log_message "job started"
 log_message "$PBS_JOBID is running on node `hostname -f`"
 test -n "$SCRATCHDIR" && log_message "scratch dir: $SCRATCHDIR" # || { echo >&2 "Variable SCRATCHDIR is not set!"}
 # move into scratch directory
-cd $SCRATCHDIR && log_message "move to SCRATCHDIR ok"# || echo "error: cd $SCRATCHDIR" >> $LOG_FILE
+cd $SCRATCHDIR && log_message "move to SCRATCHDIR ok" # || echo "error: cd $SCRATCHDIR" >> $LOG_FILE
 
 # monitor system usage
 chmod +x sys_monitor.sh
@@ -33,7 +33,7 @@ module add singul/ && log_message "singularity loaded" # || echo "singularity no
 source setup_scratch.sh && log_message "setup_scratch ok"   # || { echo "Error on setup_scratch" >> $LOG_FILE}
 
 # create pre-processing pipeline
-$ && log_message "$(date) create_pdal_pipeline ok" 
+source create_pdal_pipeline.sh && log_message "$(date) create_pdal_pipeline ok" 
 
 # process data
 source process_data.sh && log_message "process_data ok"
