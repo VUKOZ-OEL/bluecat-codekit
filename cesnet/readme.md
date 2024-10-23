@@ -14,7 +14,7 @@ singularity build lastools.img docker://hakonamdal/lastools:latest
 singularity build cloudcompare.img docker://tswetnam/cloudcompare:latest
 ```
 
-####
+#### Run SH files
 ```
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /storage/plzen1/home/krucek/gs-lcr/001/ray_klepacov1_vox001.sh
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /storage/plzen1/home/krucek/gs-lcr/001/ray_klepacov2_vox001.sh
