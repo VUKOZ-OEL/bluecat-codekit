@@ -23,3 +23,5 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /sto
 
 
 source /storage/plzen1/home/krucek/test_dir/master.sh rudice_sample /storage/plzen1/home/krucek/test_dir
+
+script -q -c "source /storage/plzen1/home/krucek/test_dir/master.sh rudice_sample.laz /storage/plzen1/home/krucek/test_dir"

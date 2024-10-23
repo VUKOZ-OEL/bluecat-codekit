@@ -10,7 +10,7 @@ LEAVES_PLY="leaves.ply"
 
 
 echo "$(date) pdal processing start" >> $LOG_FILE
-singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal_pipeline.json
+singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal pipeline /data/pdal_pipeline.json
 echo "$(date) pdal processing end" >> $LOG_FILE
 
 

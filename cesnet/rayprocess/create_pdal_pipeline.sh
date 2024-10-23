@@ -2,7 +2,8 @@
 
 # Assign input arguments to variables
 INPUT_FILE=${1:-$SOURCE_DATA}  # First argument is the input file (e.g., data.laz)
-OUTPUT_FILE=${2:-$cloud.laz}   # Second argument is the output file (e.g., cloud.laz)
+OUTPUT_FILE="cloud.laz"
+# OUTPUT_FILE=${2:-$cloud.laz}   # Second argument is the output file (e.g., cloud.laz)
 # VOXELIZE=${3:-$VOXELIZE}     # Third argument is true/false for voxelization
 # ADD_TIME=${4:-$ADD_TIME}    # Fourth argument is true/false for adding GPS time
 # VOX_RES=${5:-$VOXEL_RES}       # Fifth argument is the voxel resolution (e.g., 0.01)
