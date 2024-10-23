@@ -7,13 +7,12 @@ DATADIR=/storage/plzen1/home/krucek/gs-lcr/001 # substitute username and path to
 LOG_FILE="$DATADIR/$DATA.info.txt"
 
 # DO NOT EDIT------------------------------------------------------------------
+# test if the scratch directory is set
+test -n "$SCRATCHDIR" || { echo >&2 "Variable SCRATCHDIR is not set!"; exit 1; }
 
 #create info file
 echo "$PBS_JOBID is running on node `hostname -f` in a scratch directory $SCRATCHDIR" >> $LOG_FILE
 echo "$(date) processing started" >> $LOG_FILE
-
-# test if the scratch directory is set
-test -n "$SCRATCHDIR" || { echo >&2 "Variable SCRATCHDIR is not set!"; exit 1; }
 
 #loads singularity
 module add singul/ || echo "singularity not loaded" >> $LOG_FILE

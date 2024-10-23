@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Assign input arguments to variables
-INPUT_FILE=$1    # First argument is the input file (e.g., data.laz)
-OUTPUT_FILE=$2   # Second argument is the output file (e.g., cloud.laz)
-VOXELIZE=$3      # Third argument is true/false for voxelization
-ADD_TIME=$4      # Fourth argument is true/false for adding GPS time
-VOX_RES=$5       # Fifth argument is the voxel resolution (e.g., 0.01)
+INPUT_FILE=${1:-$SOURCE_DATA}  # First argument is the input file (e.g., data.laz)
+OUTPUT_FILE=${2:-$cloud.laz}   # Second argument is the output file (e.g., cloud.laz)
+# VOXELIZE=${3:-$VOXELIZE}     # Third argument is true/false for voxelization
+# ADD_TIME=${4:-$ADD_TIME}    # Fourth argument is true/false for adding GPS time
+# VOX_RES=${5:-$VOXEL_RES}       # Fifth argument is the voxel resolution (e.g., 0.01)
 
 # Initialize the basic part of the PDAL pipeline (read input file)
 pipeline="{
@@ -19,7 +19,7 @@ pipeline="{
 if [ "$VOXELIZE" == "true" ]; then
   pipeline+=",{
       \"type\": \"filters.voxeldownsize\",
-      \"cell\": $VOX_RES,
+      \"cell\": $VOXEL_RES,
       \"mode\": \"center\"
     }"
 fi

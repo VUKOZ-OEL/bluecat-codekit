@@ -1,33 +1,51 @@
 #!/bin/bash
 
-export DATA=$1 # First argument is the input file (e.g., cloud_name) without extension
-export DATADIR=$2 # Second argument is the dir path (e.g., /storage/plzen1/home/krucek/gs-lcr/001)
+# Define
+export LOG_FILE="$DATADIR/$SOURCE_DATA.info.txt"
 
-VOXELIZE=${1:-false}
-VOXEL_RES=${1:-0.02}
-ADD_TIME=${1:-false}
+log_message() {
+    local MESSAGE=$1
+    echo "$(date) $MESSAGE" >> $LOG_FILE
+}
 
-export LOG_FILE="$DATADIR/$DATA.info.txt"
-export SOURCE_DATA="${DATA}.laz"
+# Export fce
+export -f log_message
 
-#create log file
-echo "$(date) job started" >> $LOG_FILE
-echo "$PBS_JOBID is running on node `hostname -f`" >> $LOG_FILE
-test -n "$SCRATCHDIR" && echo "scratch dir: $SCRATCHDIR" >> $LOG_FILE # || { echo >&2 "Variable SCRATCHDIR is not set!"}
 
+#Start logging
+log_message "job started"
+log_message "$PBS_JOBID is running on node `hostname -f`"
+test -n "$SCRATCHDIR" && log_message "scratch dir: $SCRATCHDIR" # || { echo >&2 "Variable SCRATCHDIR is not set!"}
 # move into scratch directory
-cd $SCRATCHDIR && echo "move to SCRATCHDIR ok" >> $LOG_FILE # || echo "error: cd $SCRATCHDIR" >> $LOG_FILE
+cd $SCRATCHDIR && log_message "move to SCRATCHDIR ok"# || echo "error: cd $SCRATCHDIR" >> $LOG_FILE
 
-#load modules
-module add singul/ && echo "singularity loaded" >> $LOG_FILE # || echo "singularity not loaded" >> $LOG_FILE
-module add git/ && echo "git loaded" >> $LOG_FILE || echo "git not loaded" >> $LOG_FILE
+# monitor system usage
+chmod +x sys_monitor.sh
+./sys_monitor.sh &
+# save process PID
+LSU_PID=$!
 
-# get processing scripts from github
-git clone https://github.com/VUKOZ-OEL/bluecat-codekit
-cp bluecat-codekit/cesnet/rayprocess/*.sh $SCRATCHDIR
 
-source setup_scratch.sh && echo "setup_scratch ok" >> $LOG_FILE # || { echo "Error on setup_scratch" >> $LOG_FILE}
-source create_pdal_pipeline.sh $SOURCE_DATA cloud.laz $VOXELIZE $ADD_TIME $VOXEL_RES
+#load singularity
+module add singul/ && log_message "singularity loaded" # || echo "singularity not loaded" >> $LOG_FILE
 
-source process_data.sh 
-source cleanup_scratch.sh
+# copy all to scratc
+source setup_scratch.sh && log_message "setup_scratch ok"   # || { echo "Error on setup_scratch" >> $LOG_FILE}
+
+# create pre-processing pipeline
+source create_pdal_pipeline.sh && log_message "$(date) create_pdal_pipeline ok" 
+
+# process data
+source process_data.sh && log_message "process_data ok"
+
+#end sys monitor
+kill -9 $LSU_PID
+
+# drop unnecesary files
+source cleanup_scratch.sh && log_message "cleanup_scratch ok"
+
+# copy results back 
+source deliver_results.sh && log_message "deliver_results ok"
+
+# cleanup_scratch
+# exit 0
