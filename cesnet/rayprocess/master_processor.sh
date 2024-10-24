@@ -13,7 +13,7 @@ export -f log_message
 
 
 #Start logging
-log_message "job started"
+log_message "$(date)  job started"
 log_message "$PBS_JOBID is running on node `hostname -f`"
 test -n "$SCRATCHDIR" && log_message "scratch dir: $SCRATCHDIR" # || { echo >&2 "Variable SCRATCHDIR is not set!"}
 # move into scratch directory
