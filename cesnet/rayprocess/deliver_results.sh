@@ -2,9 +2,13 @@
 cp $LOG_FILE log
 
 
+
 # Create a ZIP file containing all results
-ZIP_NAME="${DATA}_results.zip"
-zip -r "$ZIP_NAME" .
+ZIP_NAME="${SOURCE_DATA}_results.zip"
+
+log_message "zi file name: $ZIP_NAME"
+
+zip -r "$ZIP_NAME" . 
 
 echo "$(date) compressed" >> $LOG_FILE
 

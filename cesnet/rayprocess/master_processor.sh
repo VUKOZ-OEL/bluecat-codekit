@@ -39,7 +39,7 @@ source create_pdal_pipeline.sh && log_message "$(date) create_pdal_pipeline ok"
 source process_data.sh && log_message "process_data ok"
 
 #end sys monitor
-kill -9 $LSU_PID
+#kill -9 $LSU_PID
 
 # drop unnecesary files
 source cleanup_scratch.sh && log_message "cleanup_scratch ok"
