@@ -1,5 +1,5 @@
 
-
+cp $LOG_FILE log
 
 
 # Create a ZIP file containing all results

@@ -1,12 +1,12 @@
 # init files names
 DATA_PLY="cloud.ply"
 TERRAIN_PLY="cloud_mesh.ply"
-TRUNKS_TXT="trunks.txt"
-FOREST_TXT="forest.txt"
-SEGMENTED_PLY="segmented.ply"
-TREES_TXT="trees.txt"
-TREES_MESH_PLY="trees_mesh.ply"
-LEAVES_PLY="leaves.ply"
+TRUNKS_TXT="cloud_trunks.txt"
+FOREST_TXT="cloud_forest.txt"
+SEGMENTED_PLY="cloud_segmented.ply"
+TREES_TXT="cloud_trees.txt"
+TREES_MESH_PLY="cloud_trees_mesh.ply"
+LEAVES_PLY="cloud_leaves.ply"
 
 
 echo "$(date) pdal processing start" >> $LOG_FILE

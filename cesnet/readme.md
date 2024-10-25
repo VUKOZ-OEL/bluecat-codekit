@@ -2,7 +2,7 @@
 
 #### Ask interactive job
 ```
-qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=3:00:00
+qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=1:00:00
 ```
 
 #### Build docker images for singularity
