@@ -2,7 +2,7 @@
 
 #### Ask interactive job
 ```
-qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=4:00:00
+qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=3:00:00
 ```
 
 #### Build docker images for singularity
@@ -25,4 +25,4 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /sto
 ```
 
 
-qsub -l select=1:ncpus=1:mem=1gb:scratch_local=11gb -l walltime=1:00:00 /storage/plzen1/home/krucek/InterCOST/sh/helios_master.sh aaa.las asdasd.xml /storage/plzen1/home/krucek/InterCOST/sh
+
