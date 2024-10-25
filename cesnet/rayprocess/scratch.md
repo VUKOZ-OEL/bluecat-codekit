@@ -13,7 +13,7 @@ export SOURCE_DATA=rudice_sample.laz
 export DATADIR=/storage/plzen1/home/krucek/test_dir
 
 export VOXELIZE=${3:-true}
-export VOXEL_RES=${4:-0.05}
+export VOXEL_RES=${4:-0.01}
 export ADD_TIME=${5:-true}
 
 

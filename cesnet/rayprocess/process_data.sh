@@ -1,6 +1,6 @@
 # init files names
 DATA_PLY="cloud.ply"
-TERRAIN_PLY="dtm_mesh.ply"
+TERRAIN_PLY="cloud_mesh.ply"
 TRUNKS_TXT="trunks.txt"
 FOREST_TXT="forest.txt"
 SEGMENTED_PLY="segmented.ply"
