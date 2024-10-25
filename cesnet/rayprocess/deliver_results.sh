@@ -1,4 +1,7 @@
 
+log_message "deliver results start"
+
+
 cp $LOG_FILE log
 
 
@@ -6,7 +9,7 @@ cp $LOG_FILE log
 # Create a ZIP file containing all results
 ZIP_NAME="${SOURCE_DATA}_results.zip"
 
-log_message "zi file name: $ZIP_NAME"
+log_message "zip file name: $ZIP_NAME"
 
 zip -r "$ZIP_NAME" . 
 
