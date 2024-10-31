@@ -42,10 +42,10 @@ source process_data.sh && log_message "process_data ok"
 #kill -9 $LSU_PID
 
 # drop unnecesary files
-source cleanup_scratch.sh && log_message "cleanup_scratch ok"
+#source cleanup_scratch.sh && log_message "cleanup_scratch ok"
 
 # copy results back 
-source log/deliver_results.sh && log_message "deliver_results ok"
+#source log/deliver_results.sh && log_message "deliver_results ok"
 
-cleanup_scratch
-exit 0
+#cleanup_scratch
+#exit 0

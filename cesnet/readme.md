@@ -33,15 +33,6 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /sto
 ```
 
 
-<<<<<<< Updated upstream
-
-=======
-<<<<<<< HEAD
-qsub -l select=1:ncpus=1:mem=1gb:scratch_local=11gb -l walltime=1:00:00 /storage/plzen1/home/krucek/InterCOST/sh/helios_master.sh aaa.las asdasd.xml /storage/plzen1/home/krucek/InterCOST/sh
 
 
-qsub -l select=1:ncpus=1:mem=1gb:scratch_local=1gb -l walltime=0:00:05 -- /storage/plzen1/home/krucek/test_helios/helios_master2.sh DN21_pine_without_vox_cut10x10.xyz test_als.xml DN21_plot_xyzloader.xml /storage/plzen1/home/krucek/test_helios
-=======
-
->>>>>>> 7ecd10096abed108e6e15af46e6cedad3613a398
->>>>>>> Stashed changes
+qsub -l select=1:ncpus=8:mem=6gb:scratch_local=5gb -l walltime=1:00:05 -- /storage/plzen1/home/krucek/test_helios/helios_master2.sh DN21_pine_without_vox_cut10x10.xyz test_als.xml DN21_plot_xyzloader.xml /storage/plzen1/home/krucek/test_helios
