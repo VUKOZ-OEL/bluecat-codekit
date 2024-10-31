@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # ADJUST ACCORDINGLY
 
 INPUT_DATA=${1:-fileName.laz}
@@ -5,9 +7,16 @@ SURVEY_XML=${2:-survey_file.xml}
 LOADER_XML=${3:-loader_file.xml}
 DATADIR=${4:-/path/to/dir/with/data}
 
+echo $INPUT_DATA >> /storage/plzen1/home/krucek/test_helios/log_file.log
+echo $SURVEY_XML >> /storage/plzen1/home/krucek/test_helios/log_file.log
+echo $LOADER_XML >> /storage/plzen1/home/krucek/test_helios/log_file.log
+echo $DATADIR >> /storage/plzen1/home/krucek/test_helios/log_file.log
+
+
 #----------------------------------------------------------------------
 # define 
-export LOG_FILE="$DATADIR/$INPUT_DATA.log"
+export LOG_FILE="$0.log"
+
 log_message() {
     local MESSAGE=$1
     echo "$(date) $MESSAGE" >> $LOG_FILE
@@ -18,7 +27,6 @@ export -f log_message
 log_message "$(date)  job started"
 log_message "$PBS_JOBID is running on node `hostname -f`"
 
-log_message echo $INPUT_DATA
 
 # PROCESSING
 # go to scratch
@@ -38,20 +46,21 @@ cp $DATADIR/$LOADER_XML $SCRATCHDIR/helios-plusplus-lin
 
 # test helios
 cd helios-plusplus-lin
+log_message "$(date)  test HELIOS:"
 run/helios --test >> $LOG_FILE
+log_message " "
 
+log_message "$(date)  run HELIOS:"
 # run simulation, to call helios executable use $HELIOS as a shortcut to whole path 
-run/helios $SCRATCHDIR/helios-plusplus-lin/$SURVEY_XML
+./run/helios $SCRATCHDIR/helios-plusplus-lin/$SURVEY_XML
 
-# cleanup
-#rm helios-plusplus-lin.tar.gz
-#rm -r helios-plusplus-lin
-#rm $SCRATCHDIR/helios-plusplus-lin/$INPUT_DATA
 
 # zip and copy results back to datadir
+log_message "$(date)  compress output:"
 ZIP_NAME="${INPUT_DATA}_helios.zip"
-zip -r output "$ZIP_NAME" .
+zip -r "$ZIP_NAME" output
+log_message "$(date)  copy results back"
 cp "$ZIP_NAME" $DATADIR
 
-
+log_message "$(date)  all done, clean_scratch"
 clean_scratch
