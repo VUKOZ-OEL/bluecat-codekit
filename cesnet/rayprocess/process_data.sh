@@ -29,6 +29,8 @@ singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayextract trees $DAT
 echo "$(date) trees extracted" >> $LOG_FILE
 singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayextract leaves $DATA_PLY $TREES_TXT
 echo "$(date) leaves extracted" >> $LOG_FILE
+singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img treeinfo $TREES_TXT
+echo "$(date) treeinfo extracted" >> $LOG_FILE
 
 echo "lof in SCRATCHDIR:" >> $LOG_FILE
 echo "$(ls -lh)" >> $LOG_FILE
@@ -50,4 +52,4 @@ for segment_file in ${SEGMENT_DIR}/*.ply; do
     #echo "Rendered image for $segment_file" >> $LOG_FILE
 done
 
-echo "$(date) segments exported" >> $LOG_FILE
+echo "$(date) segments exported" >> $LOG_FILE-h": executable file not found in $PATH
