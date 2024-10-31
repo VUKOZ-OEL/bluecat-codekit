@@ -2,15 +2,10 @@
 
 #### Ask interactive job
 ```
-<<<<<<< Updated upstream
 qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=1:00:00
-=======
-<<<<<<< HEAD
 qsub -I -l select=1:ncpus=12:mem=16gb:scratch_local=25gb -l walltime=2:00:00
-=======
 qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=1:00:00
->>>>>>> 7ecd10096abed108e6e15af46e6cedad3613a398
->>>>>>> Stashed changes
+
 ```
 
 #### Build docker images for singularity
