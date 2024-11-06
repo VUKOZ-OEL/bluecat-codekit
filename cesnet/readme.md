@@ -15,9 +15,6 @@ singularity build r-lidar-tools.img docker://martinkrucek/r-lidar-tools:latest
 singularity build pdal.img docker://pdal/pdal:latest
 singularity build lastools.img docker://pointscene/lastools:latest
 singularity build cloudcompare.img docker://tswetnam/cloudcompare:latest
-
-singularity build heliospp.img docker://heliospp/heliospp-py38
-singularity build heliospp.img docker://heliospp/heliospp-py39
 ```
 
 #### Run SH files
