@@ -34,3 +34,5 @@ qsub -l select=1:ncpus=8:mem=6gb:scratch_local=10gb -l walltime=2:00:00 -- /stor
 
 
 qsub -l select=1:ncpus=8:mem=6gb:scratch_local=10gb -l walltime=2:00:05 -- /storage/plzen1/home/krucek/test_dir/master.sh rudice_sample.laz /storage/plzen1/home/krucek/test_dir
+
+qsub -l select=1:ncpus=16:mem=32gb:scratch_local=20gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh DN13_voxels_0_01_cut50x50.laz /storage/projects2/InterCOST/segmentation
