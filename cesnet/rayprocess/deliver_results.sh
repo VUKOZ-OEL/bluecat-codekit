@@ -1,6 +1,9 @@
 
 log_message "deliver results start"
 
+
+cp cloud_trees_info.txt "/storage/projects2/InterCOST/segmentation/results/trees_info/$SOURCE_DATA.treeInfo.txt"
+
 cp $LOG_FILE log
 
 cp $LOG_FILE log

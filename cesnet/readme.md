@@ -4,7 +4,7 @@
 ```
 qsub -I -l select=1:ncpus=2:mem=32gb:scratch_local=50gb -l walltime=2:00:00
 qsub -I -l select=1:ncpus=12:mem=16gb:scratch_local=25gb -l walltime=2:00:00
-qsub -I -l select=1:ncpus=6:mem=8gb:scratch_local=10gb -l walltime=1:00:00
+qsub -I -l select=1:ncpus=2:mem=2gb:scratch_local=10gb -l walltime=1:00:00
 
 ```
 
