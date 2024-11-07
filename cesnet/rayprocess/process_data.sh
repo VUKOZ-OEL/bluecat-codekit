@@ -75,6 +75,7 @@ for segment_file in ${SEGMENT_DIR}/*.ply; do
     segment_laz="${segment_file%.ply}.laz"
     segment_traj="${segment_file%.ply}.txt"
     singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayexport $segment_file $segment_laz $segment_traj
+    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img raywrap "$segment_file" inwards 1.0
     #echo "Rendered image for $segment_file" >> $LOG_FILE
 done
 
