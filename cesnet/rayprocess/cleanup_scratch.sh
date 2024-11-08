@@ -1,7 +1,7 @@
 # remove 
 rm -rf bluecat-codekit
 rm -rf $SOURCE_DATA
-rm -rf cloud.laz
+# rm -rf cloud.laz
 rm -rf raycloudtools.img
 rm -rf pdal.img
 
