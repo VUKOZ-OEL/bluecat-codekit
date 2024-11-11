@@ -49,6 +49,12 @@ while true; do
         echo "$(date) rayextract trees failed, decimating to every $decimation_level-th ray" >> $LOG_FILE
         # Decimate the ray cloud data
         singularity exec -B $SCRATCHDIR:/data ./raycloudtools.img raydecimate $DATA_PLY $decimation_level rays
+
+        # Exit loop if decimation_level reaches 10
+        if [ $decimation_level -ge 12 ]; then
+            echo "$(date) decimation level reached 10, stopping loop" >> $LOG_FILE
+            break
+        fi
     fi
 done
 
