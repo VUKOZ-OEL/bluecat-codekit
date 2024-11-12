@@ -85,4 +85,4 @@ for segment_file in ${SEGMENT_DIR}/*.ply; do
     #echo "Rendered image for $segment_file" >> $LOG_FILE
 done
 
-echo "$(date) segments exported" >> $LOG_FILE-h": executable file not found in $PATH
+echo "$(date) segments exported" >> $LOG_FILE
