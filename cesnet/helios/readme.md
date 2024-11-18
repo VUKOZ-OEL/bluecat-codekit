@@ -3,7 +3,7 @@ singularity exec -B $SCRATCHDIR/:/data ./lastools.img txt2las -i data.xyz -o ola
 
 qsub -l select=1:ncpus=4:mem=24gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/projects2/InterCOST/simulate.sh RN_4_N.laz als_RN_4_N.xml xyzloader_RN_4_N.xml /storage/projects2/InterCOST/simulations/RN
 
-
+qsub -l select=1:ncpus=4:mem=24gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/projects2/InterCOST/simulate.sh RN_4_N.laz xyzloader_RN_4_N.xml als_RN_4_N.xml /storage/projects2/InterCOST/simulations/RN
 
 
 singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img raywrap segments/cloud_segmented_320.ply downwards 5.0
@@ -22,4 +22,11 @@ singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img raywrap segments/clou
 cp segments/cloud_segmented_320_mesh.ply /storage/projects2/InterCOST/segmentation/outwards_1.ply
 
 cp segments/cloud_segmented_320.ply /storage/projects2/InterCOST/segmentation/cloud_segmented_320.ply
+
+qsub -I select=1:ncpus=4:mem=24gb:scratch_local=150gb -l walltime=1:00:00 
+
+INPUT_DATA=RN_4_N.laz
+SURVEY_XML=als_RN_4_N.xml
+LOADER_XML=xyzloader_RN_4_N.xml
+DATADIR=/storage/projects2/InterCOST/simulations/RN
 
