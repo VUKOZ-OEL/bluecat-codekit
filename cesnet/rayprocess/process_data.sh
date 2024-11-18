@@ -49,6 +49,12 @@ while true; do
         echo "$(date) rayextract trees failed, decimating to every $decimation_level-th ray" >> $LOG_FILE
         # Decimate the ray cloud data
         singularity exec -B $SCRATCHDIR:/data ./raycloudtools.img raydecimate $DATA_PLY $decimation_level rays
+
+        # Exit loop if decimation_level reaches 10
+        if [ $decimation_level -ge 12 ]; then
+            echo "$(date) decimation level reached 10, stopping loop" >> $LOG_FILE
+            break
+        fi
     fi
 done
 
@@ -79,4 +85,4 @@ for segment_file in ${SEGMENT_DIR}/*.ply; do
     #echo "Rendered image for $segment_file" >> $LOG_FILE
 done
 
-echo "$(date) segments exported" >> $LOG_FILE-h": executable file not found in $PATH
+echo "$(date) segments exported" >> $LOG_FILE

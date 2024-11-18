@@ -1,6 +1,7 @@
 ## > https://profile.e-infra.cz/profile/
 ## > https://perun.einfra.cesnet.cz/
 
+
 ## code used to run on cesnet infrastructure
 
 #### Ask interactive job
@@ -39,7 +40,11 @@ qsub -l select=1:ncpus=8:mem=6gb:scratch_local=10gb -l walltime=2:00:05 -- /stor
 
 qsub -l select=1:ncpus=16:mem=32gb:scratch_local=20gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh DN13_voxels_0_01_cut50x50.laz /storage/projects2/InterCOST/segmentation
 
+
 qsub -l select=1:ncpus=16:mem=32gb:scratch_local=200gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/WFDP/segment.sh WFDP_q5.laz /storage/plzen1/home/krucek/WFDP
 
+-m u:janoutova:rwx /storage/projects2/InterCOST
 
-setfacl -m u:janoutova:rwx /storage/projects2/InterCOST
+qsub -l select=1:ncpus=16:mem=128gb:scratch_local=200gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/WFDP/segment.sh WFDP_q5.laz /storage/plzen1/home/krucek/WFDP
+
+
