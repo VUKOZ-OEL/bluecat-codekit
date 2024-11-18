@@ -31,7 +31,7 @@ echo "$(date) forest extracted" >> $LOG_FILE
 # In case of insufficent RAM tree exraction is killed on cesnet
 # LOOP ITERATIVELY DECIMATES CLOUD BY HALF UNTILL TREES ARE EXTRACTED (start with full resolution)
 cp c$DATA_PLY cloud_decimated.ply
-decimation_level=0  # Start with raydecimate at every 2nd ray
+decimation_level=2  # Start with raydecimate at every 2nd ray
 while true; do
     echo "$(date) attempting to extract trees with decimation level: $decimation_level" >> $LOG_FILE
     singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayextract trees cloud_decimated.ply $TERRAIN_PLY
