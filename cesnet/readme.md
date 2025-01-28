@@ -23,9 +23,9 @@ singularity build cloudcompare.img docker://tswetnam/cloudcompare:latest
 
 #### Run SH files
 ```
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /storage/plzen1/home/krucek/gs-lcr/001/ray_klepacov1_vox001.sh
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /storage/plzen1/home/krucek/gs-lcr/001/ray_klepacov2_vox001.sh
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 /storage/plzen1/home/krucek/gs-lcr/001/ray_rudice_vox001.sh
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/segment.sh SLP_Klepacov1_clip_vox001_gpst.laz /storage/plzen1/home/krucek/gs-lcr/001 false 0.01 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/segment.sh SLP_Klepacov2_clip_vox001_gpst.laz /storage/plzen1/home/krucek/gs-lcr/001 false 0.01 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/segment.sh SLP_Rudice_clip_vox001_gpst.laz false /storage/plzen1/home/krucek/gs-lcr/001 false 0.01 true
 
 qsub -l select=1:ncpus=4:mem=6gb:scratch_local=15gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/test_dir/master.sh rudice_sample.laz /storage/plzen1/home/krucek/test_dir true 0.01 true
 ```
@@ -47,4 +47,6 @@ qsub -l select=1:ncpus=16:mem=32gb:scratch_local=200gb -l walltime=12:00:00 -- /
 
 qsub -l select=1:ncpus=16:mem=128gb:scratch_local=200gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/WFDP/segment.sh WFDP_q5.laz /storage/plzen1/home/krucek/WFDP
 
+qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh WFDP_2021_q2_001.laz /storage/projects2/InterCOST/segmentation/raw_data true 0.01 true
 
+uments\GitHub\VUKOZ-OEL\3d-forest\out\build\x64-Debug\src\apps\3dforest

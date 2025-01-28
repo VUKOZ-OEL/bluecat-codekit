@@ -27,6 +27,6 @@ qsub -I -l select=1:ncpus=4:mem=16gb:scratch_local=25gb -l walltime=1:00:00
 cd /storage/projects2/InterCOST/simulations/rn_test
 ./simulate_uniloader.sh RN_4_N.laz als_RN_4_N_uniloader.xml cloud_xyzloader.xml /storage/projects2/InterCOST/simulations/rn_test
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=125gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/simulations/rn_test/simulate_uniloader.sh RN_4_N.laz als_RN_4_N_uniloader.xml cloud_xyzloader.xml /storage/projects2/InterCOST/simulations/rn_test
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=125gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/simulations/rn_test/simulate_uniloader.sh RN_4_N_001.laz als_RN_4_N_uniloader.xml cloud_xyzloader.xml /storage/projects2/InterCOST/simulations/rn_test
 
 qsub -l select=1:ncpus=4:mem=64gb:scratch_local=12gb -l walltime=00:30:00 -- /storage/projects2/InterCOST/simulations/rn_test/simulate_uniloader.sh RN_4_N_nth999.laz als_RN_4_N_uniloader.xml cloud_xyzloader.xml /storage/projects2/InterCOST/simulations/rn_test
