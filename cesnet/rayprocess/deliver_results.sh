@@ -2,7 +2,8 @@
 log_message "deliver results start"
 
 
-cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt"
+
+cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt" &>> >(log_message)
 
 cp $LOG_FILE log
 

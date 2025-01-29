@@ -1,5 +1,6 @@
 # setup sublime: https://www.geeksforgeeks.org/how-to-use-terminal-in-sublime-text-editor/
-
+alt + 1
+@
 
 
 ## Example command
@@ -25,6 +26,10 @@ qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /st
 qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh rz_06.laz /storage/plzen1/home/krucek/data/rz_voxelized false 0.02 true
 qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh rz_07.laz /storage/plzen1/home/krucek/data/rz_voxelized false 0.02 true
 qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh rz_08.laz /storage/plzen1/home/krucek/data/rz_voxelized false 0.02 true
-
 qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh rz_02.laz /storage/plzen1/home/krucek/data/rz_voxelized false 0.02 true
+```
+
+```
+qsub -l select=1:ncpus=6:mem=24gb:scratch_local=50gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/segment.sh zh_02.laz /storage/plzen1/home/krucek/data/zh_voxelized true 0.02 true
+
 ```
