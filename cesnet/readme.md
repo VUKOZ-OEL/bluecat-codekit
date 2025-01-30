@@ -6,7 +6,7 @@
 
 #### Ask interactive job
 ```
-qsub -I -l select=1:ncpus=6:mem=64gb:scratch_local=100gb -l walltime=4:00:00
+qsub -I -l select=1:ncpus=6:mem=4gb:scratch_local=10gb -l walltime=4:00:00
 qsub -I -l select=1:ncpus=12:mem=16gb:scratch_local=25gb -l walltime=2:00:00
 qsub -I -l select=1:ncpus=2:mem=2gb:scratch_local=10gb -l walltime=1:00:00
 
@@ -50,3 +50,20 @@ qsub -l select=1:ncpus=16:mem=128gb:scratch_local=200gb -l walltime=24:00:00 -- 
 qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh WFDP_2021_q2_001.laz /storage/projects2/InterCOST/segmentation/raw_data true 0.01 true
 
 uments\GitHub\VUKOZ-OEL\3d-forest\out\build\x64-Debug\src\apps\3dforest
+
+docker run --rm -v C:\Users\krucek\Documents\razula\rz_01:/data pdal/pdal pdal info --metadata --count 1 /segments/laz/cloud_segmented_-1.laz > output.txt
+docker run --rm -v C:\Users\krucek\Documents\razula\rz_01\segments\laz:/data pdal/pdal pdal info -p 0 /data/cloud_segmented_2.laz > /data/output.txt
+
+save_first_coord.sh /storage/plzen1/home/krucek/data/rz_voxelized
+
+cd $SCRATCHDIR
+
+cp /storage/plzen1/home/krucek/data/rz_voxelized/rz_01.laz $SCRATCHDIR
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_voxelized/rz_06.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_voxelized/rz_07.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_voxelized/rz_08.laz
+
+export FILE_IN=/storage/plzen1/home/krucek/data/rz_voxelized/rz_03.laz
+
+./save_first_coord.sh /storage/plzen1/home/krucek/data/rz_voxelized/rz_04.laz

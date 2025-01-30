@@ -19,22 +19,34 @@ qsub -l select=1:ncpus=2:mem=4gb:scratch_local=15gb -l walltime=1:00:00 -- /stor
 ### Commands
 #### RZ
 ```
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_rozek_SVV.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_07.laz 0.02 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ12+12Bgeo.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_01.laz 0.02 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/Z_240213.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_02.laz 0.02 1 0 24
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ12+12Bgeo.laz /storage/plzen1/home/krucek/data/rz_0005/rz_01.laz 0.005 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_jih_potok_k40.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_03.laz 0.02 1 0 24
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_240213.laz /storage/plzen1/home/krucek/data/rz_0005/rz_02.laz 0.005 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_jih_stred_kolik31.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_04.laz 0.02 1 0 24
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_jih_potok_k40.laz /storage/plzen1/home/krucek/data/rz_0005/rz_03.laz 0.005 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_roh_SSV.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_05.laz 0.02 1 0 24
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_jih_stred_kolik31.laz /storage/plzen1/home/krucek/data/rz_0005/rz_04.laz 0.005 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_roh_SZ_kolik23.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_06.laz 0.02 1 0 24
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_roh_SSV.laz /storage/plzen1/home/krucek/data/rz_0005/rz_05.laz 0.005 1 0 24
 
-qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/rz240213B+14.laz /storage/plzen1/home/krucek/data/rz_voxelized/rz_08.laz 0.02 1 0 24
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_roh_SZ_kolik23.laz /storage/plzen1/home/krucek/data/rz_0005/rz_06.laz 0.005 1 0 24
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/RZ_rozek_SVV.laz /storage/plzen1/home/krucek/data/rz_0005/rz_07.laz 0.005 1 0 24
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/rz/rz240213B+14.laz /storage/plzen1/home/krucek/data/rz_0005/rz_08.laz 0.005 1 0 24
 
 
 ```
 
+#### ZH
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/zh/ZakovaHora_240205_06_3.laz /storage/plzen1/home/krucek/data/zh_voxelized/zh_02.laz 0.005 1 0 24
+
+```
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=350gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/zh/ZakovaHora0208.laz /storage/plzen1/home/krucek/data/zh_voxelized/zh_01.laz 0.005 1 0 24
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/zh/ZakovaHora_240205_5-6_2.laz /storage/plzen1/home/krucek/data/zh_voxelized/zh_03.laz 0.005 1 0 24
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/zh/ZakovaHora_240207.laz /storage/plzen1/home/krucek/data/zh_voxelized/zh_04.laz 0.005 1 0 24
+```
