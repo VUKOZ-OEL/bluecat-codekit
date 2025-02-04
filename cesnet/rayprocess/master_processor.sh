@@ -38,7 +38,7 @@ source create_pdal_pipeline.sh && log_message "$(date) create_pdal_pipeline ok"
 # process data
 source process_data.sh && log_message "process_data ok"
 
-cp cloud.laz $DATADIR/cloud.laz
+#cp cloud.laz $DATADIR/cloud.laz
 
 #end sys monitor
 #kill -9 $LSU_PID
