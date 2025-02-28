@@ -30,6 +30,7 @@ qsub -l select=1:ncpus=16:mem=64gb:scratch_local=125gb -l walltime=12:00:00 -- /
 ```
 
 ```
-qsub -l select=1:ncpus=16:mem=64gb:scratch_local=50gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/segment.sh zh_02.laz /storage/plzen1/home/krucek/data/zh_voxelized true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 07_test.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.02 true
+qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 07_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.02 true
 
 ```
