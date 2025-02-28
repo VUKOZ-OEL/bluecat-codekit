@@ -62,3 +62,4 @@ qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- 
 
 qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/plzen1/home/krucek/data/zh/02_tiles/-636800_-1105100_1.laz /storage/plzen1/home/krucek/data/zh/tile_voxels.laz 0.005
 
+qsub -l select=1:ncpus=8:mem=8gb:scratch_local=30gb -l walltime=2:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/projects2/InterCOST/simulations/tiles/sl_6.laz /storage/projects2/InterCOST/simulations/tiles/sl_6_vox.laz 0.01
