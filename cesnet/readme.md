@@ -40,8 +40,8 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 06_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.01 true
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 07_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.01 true
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 08_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.01 true
+```
 
-<<<<<<< Updated upstream
 qsub -l select=1:ncpus=8:mem=6gb:scratch_local=10gb -l walltime=2:00:00 -- /storage/plzen1/home/krucek/test_helios/helios_master2.sh DN21_pine_without_vox_cut10x10.xyz test_als.xml DN21_plot_xyzloader.xml /storage/plzen1/home/krucek/test_helios
 
 
@@ -76,5 +76,26 @@ qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /stor
 export FILE_IN=/storage/plzen1/home/krucek/data/rz_voxelized/rz_03.laz
 
 ./save_first_coord.sh /storage/plzen1/home/krucek/data/rz_voxelized/rz_04.laz
-=======
->>>>>>> Stashed changes
+
+
+```
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/gs-lcr/Buchlovice.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/gs-lcr/Krivoklat.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/gs-lcr/SLP_Pokojna_hora.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/gs-lcr/SLP_Klepacov1.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/gs-lcr/SLP_Klepacov2.laz
+
+```
+
+```
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/01_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/02_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/03_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/04_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/05_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/06_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/07_clipped.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/rz_0005/08_clipped.laz
+
+```
+

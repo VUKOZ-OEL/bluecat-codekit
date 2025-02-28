@@ -41,7 +41,7 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /
 ```
 qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/plzen1/home/krucek/data/zh/ZH_02.laz /storage/plzen1/home/krucek/data/zh/UH_02_voxels.laz 0.005
 
-<<<<<<< Updated upstream
+
 #### ZH
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/zh/ZakovaHora_240205_06_3.laz /storage/plzen1/home/krucek/data/zh_voxelized/zh_02.laz 0.005 1 0 24
 
@@ -52,7 +52,8 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250gb -l walltime=12:00:00 -- /
 
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/voxelize.sh /storage/plzen1/home/krucek/data/zh/ZakovaHora_240207.laz /storage/plzen1/home/krucek/data/zh_voxelized/zh_04.laz 0.005 1 0 24
 ```
-=======
+
+
 qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/plzen1/home/krucek/data/zh/ZH_03.laz /storage/plzen1/home/krucek/data/zh/ZH_03_voxels.laz 0.005
 
 qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/plzen1/home/krucek/data/zh/ZH_04.laz /storage/plzen1/home/krucek/data/zh/ZH_04_voxels.laz 0.005
@@ -61,4 +62,6 @@ qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- 
 
 
 qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/plzen1/home/krucek/data/zh/02_tiles/-636800_-1105100_1.laz /storage/plzen1/home/krucek/data/zh/tile_voxels.laz 0.005
->>>>>>> Stashed changes
+
+qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize2.sh /storage/plzen1/home/krucek/data/zh/02_tiles/-636800_-1105100_1.laz /storage/plzen1/home/krucek/data/zh/tile_voxels.laz 0.005
+
