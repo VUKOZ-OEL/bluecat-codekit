@@ -6,7 +6,7 @@
 
 #### Ask interactive job
 ```
-qsub -I -l select=1:ncpus=6:mem=4gb:scratch_local=10gb -l walltime=4:00:00
+qsub -I -l select=1:ncpus=4:mem=8gb:scratch_local=10gb -l walltime=1:00:00
 qsub -I -l select=1:ncpus=12:mem=16gb:scratch_local=25gb -l walltime=2:00:00
 qsub -I -l select=1:ncpus=2:mem=2gb:scratch_local=10gb -l walltime=1:00:00
 
@@ -40,6 +40,7 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 06_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.01 true
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 07_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.01 true
 qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh 08_clipped.laz /storage/plzen1/home/krucek/data/rz_0005 true 0.01 true
+<<<<<<< Updated upstream
 ```
 
 qsub -l select=1:ncpus=8:mem=6gb:scratch_local=10gb -l walltime=2:00:00 -- /storage/plzen1/home/krucek/test_helios/helios_master2.sh DN21_pine_without_vox_cut10x10.xyz test_als.xml DN21_plot_xyzloader.xml /storage/plzen1/home/krucek/test_helios
@@ -99,3 +100,6 @@ qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /stor
 
 ```
 
+=======
+
+>>>>>>> Stashed changes
