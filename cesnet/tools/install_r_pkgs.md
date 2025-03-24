@@ -9,3 +9,6 @@ install.packages("RCSF",lib="/auto/plzen1/home/krucek/Rpackages")
 export R_LIBS_USER="/auto/plzen1/home/krucek/Rpackages"
 
 Sys.setenv(R_LIBS_USER = "/storage/plzen1/home/krucek/Rpackages")
+
+
+.libPaths()
