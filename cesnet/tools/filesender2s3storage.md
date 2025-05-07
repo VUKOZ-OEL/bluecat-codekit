@@ -1,0 +1,1 @@
+qsub -I -l select=1:ncpus=2:mem=4gb:scratch_local=100gb -l walltime=2:00:00 -- /storage/plzen1/home/krucek/scripts/filesender2s3storage.sh "https://filesender.cesnet.cz/download.php?token=2eb3d300-3b86-46a7-a65e-50b0dc1d652d&files_ids=683351%2C683350%2C683349%2C683348%2C683347%2C683346%2C683345" "s3://wp2/FVA-BW/"
