@@ -17,7 +17,14 @@ echo "$(date) pdal processing end" >> $LOG_FILE
 
 echo "$(date) raycloudtools processing start" >> $LOG_FILE
 # RUN raycloudtools in singularity to process the data
-singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayimport cloud.laz ray 0,0,-10 --remove_start_pos
+
+if [ "$TRAJECTORY" != "false" ]; then
+    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayimport cloud.laz $TRAJECTORY
+else
+    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayimport cloud.laz ray 0,0,-10 --remove_start_pos
+fi
+
+
 echo "$(date) loaded" >> $LOG_FILE
 singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayextract terrain $DATA_PLY
 echo "$(date) terrain extracted" >> $LOG_FILE
