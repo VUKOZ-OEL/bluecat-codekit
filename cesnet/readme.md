@@ -7,9 +7,9 @@
 
 #### Ask interactive job
 ```
-qsub -I -l select=1:ncpus=6:mem=16gb:scratch_local=10gb -l walltime=1:00:00
-qsub -I -l select=1:ncpus=12:mem=16gb:scratch_local=25gb -l walltime=2:00:00
-qsub -I -l select=1:ncpus=6:mem=6gb:scratch_local=10gb -l walltime=1:00:00
+qsub -I -l select=1:ncpus=4:mem=16gb:scratch_local=100gb -l walltime=3:00:00
+qsub -I -l select=1:ncpus=12:mem=64gb:scratch_local=25gb -l walltime=4:00:00
+qsub -I -l select=1:ncpus=6:mem=6gb:scratch_local=10gb -l walltime=2:00:00
 
 ```
 
@@ -20,6 +20,9 @@ singularity build r-lidar-tools.img docker://martinkrucek/r-lidar-tools:latest
 singularity build pdal.img docker://pdal/pdal:latest
 singularity build lastools.img docker://pointscene/lastools:latest
 singularity build cloudcompare.img docker://tswetnam/cloudcompare:latest
+
+
+
 ```
 
 #### Run SH files
@@ -76,5 +79,64 @@ matlab -r "run('/storage/projects2/InterCOST/trees/qsm_test_trees.m'); exit"
 qsub -l select=1:ncpus=6:mem=6gb:scratch_local=10gb -l walltime=1:00:00 /storage/projects2/InterCOST/trees/qsm_test_trees.sh
 qsub -I -l select=1:ncpus=6:mem=6gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/projects2/InterCOST/trees/qsm_test_trees.sh
 
-qsub -l select=1:ncpus=24:mem=24gb:scratch_local=10gb -l walltime=24:00:00 /storage/projects2/InterCOST/trees/qsm_bc_trees.sh
-qsub -l select=1:ncpus=24:mem=24gb:scratch_local=10gb -l walltime=24:00:00 /storage/projects2/InterCOST/trees/qsm_cg_trees.sh
+qsub -l select=1:ncpus=12:mem=14gb:scratch_local=25gb -l walltime=24:00:00 /storage/projects2/InterCOST/trees/qsm_bc_trees.sh
+qsub -l select=1:ncpus=16:mem=32gb:scratch_local=25gb -l walltime=24:00:00 /storage/projects2/InterCOST/trees/qsm_cg_trees.sh
+
+qsub -l select=1:ncpus=12:mem=24gb:scratch_local=25gb -l walltime=2:00:00 /storage/projects2/InterCOST/trees/qsm_bc_trees.sh
+qsub -l select=1:ncpus=24:mem=24gb:scratch_local=10gb -l walltime=2:00:00 /storage/projects2/InterCOST/trees/qsm_cg_trees.sh
+
+qsub -I -l select=1:ncpus=4:mem=4gb:scratch_local=5gb -l walltime=00:30:00 -- /storage/projects2/InterCOST/trees/create_qsm.sh /storage/projects2/InterCOST/trees/test_trees/las/00056238b943.las
+qsub -- create_qsm.sh /storage/projects2/InterCOST/trees/test_trees/las/00056238b943.las
+
+#PBS -N create_qsm
+#PBS -l select=1:ncpus=4:mem=4gb:scratch_local=5gb
+#PBS -l walltime=00:30:00 
+
+qsub -I -- /storage/projects2/InterCOST/create_qsm.sh /storage/projects2/InterCOST/trees/test_trees/las/00056238b943.las
+qsub -I -- /storage/projects2/InterCOST/create_qsm.sh /storage/projects2/InterCOST/trees/test_trees/las/00056238b943.las
+
+chmod -R g=rwx /storage/projects2/InterCOST
+chgrp -R intercost /storage/projects2/InterCOST
+
+# Sestavení MATLAB příkazu
+MATLAB_CMD=$(cat <<EOF
+try
+    cd('/auto/plzen1/projects2/InterCOST/trees');
+    addpath(genpath('TreeQSM'));
+    lasReader = lasFileReader('$LAS_FILE');
+    ptCloud = readPointCloud(lasReader);
+    P = ptCloud.Location;
+    P = P - mean(P);
+    inputs = define_input(P, 1, 1, 1);
+    QSMmodel = treeqsm(P, inputs);
+    saveFilePath = fullfile('$LAS_DIR', strcat('$LAS_NAME', '_QSM.mat'));
+    save(saveFilePath, 'QSMmodel');
+    fprintf('Model uložen: %s\n', saveFilePath);
+catch ME
+    fprintf('Chyba: %s\n', ME.message);
+end
+exit
+EOF
+)
+
+# Spuštění MATLABu
+matlab -nodisplay -nosplash -r "$MATLAB_CMD"
+
+
+qsub -I -l select=1:ncpus=1:mem=1gb:scratch_local=1gb -l walltime=00:1:00 -- /storage/projects2/InterCOST/trees/run_qsm.sh /storage/projects2/InterCOST/trees/test_trees/las/00056238b943.las
+
+qsub -I -l select=1:ncpus=1:mem=1gb:scratch_local=1gb -l walltime=00:1:00 -- /storage/projects2/InterCOST/trees/run_qsm.sh
+
+@
+
+sync_with_group bluecat /storage/projects2/InterCOST/singularity_img/pdal.img /storage/brno2/home/krucek/bluecat/singularity_img/pdal.img
+sync_with_group bluecat /storage/projects2/InterCOST/singularity_img/lastools.img /storage/brno2/home/krucek/bluecat/singularity_img/lastools.img
+sync_with_group bluecat /storage/projects2/InterCOST/singularity_img/cloudcompare.img /storage/brno2/home/krucek/bluecat/singularity_img/cloudcompare.img
+sync_with_group bluecat /storage/projects2/InterCOST/singularity_img/raycloudtools.img /storage/brno2/home/krucek/bluecat/singularity_img/raycloudtools.img
+
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh Doutnac_north_MLS_2025.laz /storage/plzen1/home/krucek/data/doutnac true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh Doutnac_south_MLS_2025.laz /storage/plzen1/home/krucek/data/doutnac true 0.02 true
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/doutnac/Doutnac_south_MLS_2025.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/doutnac/Doutnac_north_MLS_2025.laz

@@ -17,3 +17,6 @@ unzip data.zip -d data/
 s5cmd --credentials-file "/storage/plzen1/home/krucek/.aws/credentials" --profile s3cmd_access --endpoint-url=https://s3.cl4.du.cesnet.cz cp "data/*" $S3_TARGET
 
 clean_scratch
+
+
+

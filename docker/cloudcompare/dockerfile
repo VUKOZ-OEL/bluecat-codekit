@@ -1,0 +1,41 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- Install system dependencies ---
+RUN apt-get update && apt-get install -y \
+    git cmake g++ \
+    libeigen3-dev libboost-all-dev \
+    qtbase5-dev libqt5svg5-dev libqt5opengl5-dev \
+    libgl1-mesa-dev zlib1g-dev \
+    curl unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Install LASzip ---
+WORKDIR /opt
+RUN git clone https://github.com/LASzip/LASzip.git && \
+    cd LASzip && \
+    mkdir build && cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install
+
+# --- Install CloudCompare CLI ---
+WORKDIR /opt
+RUN git clone https://github.com/CloudCompare/CloudCompare.git && \
+    mkdir -p CloudCompare/build && \
+    cd CloudCompare/build && \
+    cmake .. \
+        -DOPTION_BUILD_CLOUDCOMPARE_CLI_ONLY=ON \
+        -DBUILD_CCVIEWER=OFF \
+        -DBUILD_CC_CORE_LIB_WITH_QT=OFF \
+        -DLASZIP_INCLUDE_DIR=/usr/local/include \
+        -DLASZIP_LIBRARY=/usr/local/lib/liblaszip.so \
+        -DCMAKE_INSTALL_PREFIX=/opt/cloudcompare && \
+    make -j$(nproc) && \
+    make install
+
+# --- Set PATH and default command ---
+ENV PATH="/opt/cloudcompare:$PATH"
+WORKDIR /data
+ENTRYPOINT ["cloudcompare"]

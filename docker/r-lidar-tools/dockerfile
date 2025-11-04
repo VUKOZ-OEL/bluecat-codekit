@@ -1,7 +1,6 @@
-
 FROM rocker/r-ver:4.3.1
 
-# Instalace systémových závislostí (nutné pro lidR)
+# Instalace systémových závislostí (nutné pro balíky GIS, ggplot2 a další)
 RUN apt-get update && apt-get install -y \
     libgdal-dev \
     libproj-dev \
@@ -10,11 +9,27 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     libxml2-dev \
     libssl-dev \
+    libfontconfig1-dev \
+    libcairo2-dev \
+    libfreetype6-dev \
+    libpng-dev \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# Instalace R balíčku lidR
-RUN R -e "install.packages('lidR', repos = 'https://cloud.r-project.org')"
+# Instalace R balíčků
+RUN R -e "install.packages(c( \
+    'lidR', \
+    'ggplot2', \
+    'raster', \
+    'terra', \
+    'viridis', \
+    'sf', \
+    'data.table', \
+    'stars', \
+    'RColorBrewer', \
+    'dplyr', \
+    'sp' \
+  ), repos = 'https://cloud.r-project.org', dependencies = TRUE)"
 
 # Pracovní složka uvnitř kontejneru
 WORKDIR /scripts
