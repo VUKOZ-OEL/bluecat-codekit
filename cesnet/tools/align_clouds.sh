@@ -33,8 +33,8 @@ cp "$B" "$SCRATCHDIR/c2.laz"
 module add singul/
 
 # Kopírování Singularity kontejnerů do scratch prostoru
-cp /storage/plzen1/home/krucek/singularity_img/raycloudtools.img "$SCRATCHDIR"
-cp /storage/projects2/InterCOST/singularity_img/pdal.img "$SCRATCHDIR"
+cp /storage/brno2/home/krucek/bluecat/singularity_img/raycloudtools.img "$SCRATCHDIR"
+cp /storage/brno2/home/krucek/bluecat/singularity_img/pdal.img "$SCRATCHDIR"
 
 # Přechod do scratch adresáře
 cd "$SCRATCHDIR" || exit 1

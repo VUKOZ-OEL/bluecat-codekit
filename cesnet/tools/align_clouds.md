@@ -43,3 +43,5 @@ qsub -l select=1:ncpus=24:mem=32gb:scratch_local=25gb -l walltime=2:00:00 -- /st
 qsub -l select=1:ncpus=24:mem=32gb:scratch_local=25gb -l walltime=2:00:00 -- /storage/plzen1/home/krucek/scripts/align_clouds.sh /storage/plzen1/home/krucek/acuveg/loff/Chvaletice_loff.laz /storage/plzen1/home/krucek/acuveg/lon_2025/Chvaletice_LON_2025.laz
 
 ```
+
+qsub -l select=1:ncpus=24:mem=32gb:scratch_local=25gb -l walltime=2:00:00 -- /storage/plzen1/home/krucek/scripts/align_clouds.sh /storage/brno2/home/krucek/bluecat/fitting/01_Salajka/VUK__18__Salajka__NA__ULS_L1.laz /storage/brno2/home/krucek/bluecat/fitting/01_Salajka/Salajka_ULS_HM_2024.laz
