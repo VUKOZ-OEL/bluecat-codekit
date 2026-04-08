@@ -1,58 +1,45 @@
 #!/bin/bash
+set -euo pipefail
 
-# Nastavení proměnných
-export SOURCE_FILE=$1  # První argument je vstupní soubor (e.g., cloud.laz)
-export RESULT_FILE=$2  # Výstupní soubor
+source "$(dirname "$0")/../common.sh"
 
-echo "$(date) node ready"
-echo "$SCRATCHDIR" 
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $0 <input.laz> <output.laz>"
+  exit 1
+fi
 
-# Přesun do scratch adresáře
-cd $SCRATCHDIR
-cp $SOURCE_FILE $SCRATCHDIR/in.laz
+SOURCE_FILE="$1"
+RESULT_FILE="$2"
+LOG_FILE="${RESULT_FILE}.log"
 
-# Přidání modulů
-module add singul/ 
-cp /storage/projects2/InterCOST/singularity_img/pdal.img $SCRATCHDIR
+cesnet::require_file "$SOURCE_FILE"
+cesnet::enter_scratch
+cesnet::load_modules
+cesnet::copy_first_existing "$SCRATCHDIR/pdal.img" /storage/projects2/InterCOST/singularity_img/pdal.img /storage/plzen1/home/krucek/singularity_img/pdal.img
 
-# Najdeme nejnižší bod na Z a průměr XY pro centrování
-singularity exec -B $SCRATCHDIR:/data ./pdal.img pdal info /data/in.laz --metadata > metadata.json
+cp "$SOURCE_FILE" in.laz
+singularity exec -B "$SCRATCHDIR":/data ./pdal.img pdal info /data/in.laz --metadata > metadata.json
 
-mkdir -p bin
-cd bin
-wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-chmod +x jq
-export PATH=$SCRATCHDIR/bin:$PATH
-cd ..
+read -r T_X T_Y T_Z < <(python3 - <<'PY'
+import json
+m=json.load(open('metadata.json'))['metadata']
+mid_x=m['minx']+((m['maxx']-m['minx'])/2)
+mid_y=m['miny']+((m['maxy']-m['miny'])/2)
+min_z=m['minz']
+print(-mid_x,-mid_y,-min_z)
+PY
+)
 
-# Extrahujeme min hodnoty Z
-MIN_Z=$(jq '.metadata.minz' metadata.json)
-
-# Vypočítáme střed XY
-MID_X=$(jq -r '.metadata.minx + ((.metadata.maxx - .metadata.minx) / 2)' metadata.json)
-MID_Y=$(jq -r '.metadata.miny + ((.metadata.maxy - .metadata.miny) / 2)' metadata.json)
-
-T_X=$(( -1 * MID_X ))
-MID_Y=$(( -1 * MID_Y ))
-MIN_Z=$(( -1 * MIN_Z ))
-
-# Vytvoříme PDAL pipeline pro centrování
-cat <<EOF > pdal_translate.json
+cat > pdal_translate.json <<JSON
 {
   "pipeline": [
-    { "type": "readers.las", "filename": "/data/in.laz" },
-    { "type": "filters.transformation",
-      "matrix":"1 0 0 $T_X 0 1 0 $T_Y 0 0 1 $T_Z 0 0 0 1"
-    },
-    { "type": "writers.las", "filename": "/data/centered.laz", "dataformat_id": 1, "minor_version": 2 }
+    {"type":"readers.las","filename":"/data/in.laz"},
+    {"type":"filters.transformation","matrix":"1 0 0 $T_X 0 1 0 $T_Y 0 0 1 $T_Z 0 0 0 1"},
+    {"type":"writers.las","filename":"/data/centered.laz","dataformat_id":1,"minor_version":2}
   ]
 }
-EOF
+JSON
 
-# Spustíme PDAL pipeline pro transformaci souřadnic
-singularity exec -B $SCRATCHDIR:/data ./pdal.img pdal pipeline /data/pdal_translate.json 
-
-# Kopírování výsledku zpět
-cp $SCRATCHDIR/centered.laz $RESULT_FILE
-
-clean_scratch
+singularity exec -B "$SCRATCHDIR":/data ./pdal.img pdal pipeline /data/pdal_translate.json
+cp centered.laz "$RESULT_FILE"
+cesnet::clean_scratch

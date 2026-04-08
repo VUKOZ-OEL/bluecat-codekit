@@ -1,15 +1,23 @@
+#!/bin/bash
+set -euo pipefail
 
+source "$(dirname "$0")/../common.sh"
 
+cesnet::require_env SCRATCHDIR DATADIR SOURCE_DATA
 
-# copy input file and raycloudtools to scratch
+cesnet::copy_first_existing "$SCRATCHDIR/raycloudtools.img" \
+  /storage/brno2/home/krucek/bluecat/singularity_img/raycloudtools.img \
+  /storage/plzen1/home/krucek/singularity_img/raycloudtools.img
 
-cp /storage/brno2/home/krucek/bluecat/singularity_img/raycloudtools.img $SCRATCHDIR && echo "raycloud copied" >> $LOG_FILE || { echo "raycloud cp error" >> $LOG_FILE; exit 1; }
-cp /storage/brno2/home/krucek/bluecat/singularity_img/pdal.img $SCRATCHDIR && echo "pdal copied" >> $LOG_FILE || { echo "pdal cp error" >> $LOG_FILE; exit 1; }
-cp $DATADIR/$SOURCE_DATA  $SCRATCHDIR && echo "data copied" >> $LOG_FILE || { echo "data cp error" >> $LOG_FILE; exit 1; }
+cesnet::copy_first_existing "$SCRATCHDIR/pdal.img" \
+  /storage/brno2/home/krucek/bluecat/singularity_img/pdal.img \
+  /storage/projects2/InterCOST/singularity_img/pdal.img \
+  /storage/plzen1/home/krucek/singularity_img/pdal.img
 
-if [ "$TRAJECTORY" != "false" ]; then
-	cp $DATADIR/$TRAJECTORY  $SCRATCHDIR && echo "data copied" >> $LOG_FILE || { echo "trajectory cp error" >> $LOG_FILE; exit 1; }
+cp "$DATADIR/$SOURCE_DATA" "$SCRATCHDIR/"
+
+if [[ "${TRAJECTORY:-false}" != "false" ]]; then
+  cp "$DATADIR/$TRAJECTORY" "$SCRATCHDIR/"
 fi
 
-
-
+cesnet::log INFO "Scratch prepared"

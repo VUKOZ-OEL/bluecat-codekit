@@ -1,56 +1,34 @@
 #!/bin/bash
+set -euo pipefail
 
-# set variables, PATH INCLUDED
-export SOURCE_FILE=$1 # First argument is the input file (e.g., cloud_name) 
-export RESULT_FILE=$2 # FILE With the eresults
+source "$(dirname "$0")/../common.sh"
 
-export VOXEL_SIZE=${3:-0.005}
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $0 <input.laz> <output.laz> [voxel_size]"
+  exit 1
+fi
 
+SOURCE_FILE="$1"
+RESULT_FILE="$2"
+VOXEL_SIZE="${3:-0.005}"
+LOG_FILE="${RESULT_FILE}.log"
 
+cesnet::require_file "$SOURCE_FILE"
+cesnet::enter_scratch
+cesnet::load_modules
+cesnet::copy_first_existing "$SCRATCHDIR/pdal.img" /storage/projects2/InterCOST/singularity_img/pdal.img /storage/plzen1/home/krucek/singularity_img/pdal.img
 
-export LOG_FILE="$RESULT_FILE.log"
-echo "$(date) node ready" >> $LOG_FILE
-echo "$SCRATCHDIR" >> $LOG_FILE
-
-# move to scratch
-cd $SCRATCHDIR
-
-cd $SCRATCHDIR &>> $LOG_FILE
-cp $SOURCE_FILE $SCRATCHDIR/in.laz &>> $LOG_FILE
-
-module add singul/ &>> $LOG_FILE
-
-cp /storage/projects2/InterCOST/singularity_img/pdal.img $SCRATCHDIR &>> $LOG_FILE
-
-# create pre-processing pipeline
-INPUT_FILE=in.laz  # First argument is the input file (e.g., data.laz)
-OUTPUT_FILE=cloud.laz
-# Initialize the basic part of the PDAL pipeline (read input file)
-pipeline="{
-  \"pipeline\": [
-    {
-      \"type\": \"readers.las\",
-      \"filename\": \"$INPUT_FILE\"
-    }"
-
-
-pipeline+=",{
-      \"type\": \"filters.voxeldownsize\",
-      \"cell\": $VOXEL_SIZE,
-      \"mode\": \"center\"
-    }"
-
-pipeline+=",{
-      \"type\": \"writers.las\",
-      \"dataformat_id\": 1,
-      \"minor_version\": 2,
-      \"filename\": \"$OUTPUT_FILE\"
-    }
+cp "$SOURCE_FILE" in.laz
+cat > pdal_pipeline.json <<JSON
+{
+  "pipeline": [
+    {"type":"readers.las","filename":"in.laz"},
+    {"type":"filters.voxeldownsize","cell":$VOXEL_SIZE,"mode":"center"},
+    {"type":"writers.las","dataformat_id":1,"minor_version":2,"filename":"cloud.laz"}
   ]
-}"
+}
+JSON
 
-echo "$pipeline" > pdal_pipeline.json
-singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal pipeline /data/pdal_pipeline.json &>> $LOG_FILE
-
-cp $OUTPUT_FILE $RESULT_FILE &>> $LOG_FILE
-clean_scratch
+singularity exec -B "$SCRATCHDIR":/data ./pdal.img pdal pipeline /data/pdal_pipeline.json
+cp cloud.laz "$RESULT_FILE"
+cesnet::clean_scratch
