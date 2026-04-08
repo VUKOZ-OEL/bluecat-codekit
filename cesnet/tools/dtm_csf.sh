@@ -1,19 +1,25 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=2:mem=16gb
-#PBS -l walltime=01:00:00
-#PBS -N lidR_job
-#PBS -o output.log
-#PBS -e error.log
-#PBS -q default
+set -euo pipefail
+
+source "$(dirname "$0")/../common.sh"
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 <input.laz>"
+  exit 1
+fi
 
 INPUT="$1"
+R_SCRIPT="/storage/plzen1/home/krucek/npo_sumava/dtm_csf.R"
+LOG_FILE="${INPUT%.laz}_csf.log"
 
-cp $INPUT $SCRATCHDIR/cloud.laz
-cp /storage/plzen1/home/krucek/npo_sumava/dtm_csf.R $SCRATCHDIR/dtm_csf.R
+cesnet::require_file "$INPUT"
+cesnet::require_file "$R_SCRIPT"
+cesnet::enter_scratch
+cp "$INPUT" cloud.laz
+cp "$R_SCRIPT" dtm_csf.R
 
-cd $SCRATCHDIR
-
-module add r/
+source /etc/profile || true
+module add r/ || true
 Rscript dtm_csf.R
-
-cp $SCRATCHDIR/ground_pts.laz "${INPUT%.laz}_csf_pts.laz"
+cp ground_pts.laz "${INPUT%.laz}_csf_pts.laz"
+cesnet::clean_scratch

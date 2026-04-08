@@ -1,4 +1,4 @@
-export SOURCE_FILE=/storage/plzen1/home/krucek/data/zh/02_tiles/-636700_-1105100_1.laz
-export RESULT_FILE=/storage/plzen1/home/krucek/data/zh/test_voxels.laz
+#!/bin/bash
+set -euo pipefail
 
-export VOXEL_SIZE=${3:-0.005}
+echo "Deprecated helper script. Use submit_job.sh with a concrete tool script."

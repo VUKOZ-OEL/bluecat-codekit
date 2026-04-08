@@ -1,5 +1,6 @@
 #!/bin/bash
+set -euo pipefail
 
-module add matlab
-
-echo "test"
+source /etc/profile || true
+module add matlab || true
+echo "QSM environment ready"
