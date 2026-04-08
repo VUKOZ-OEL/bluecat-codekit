@@ -142,3 +142,45 @@ qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250 -l walltime=12:00:00 -- /st
 
 qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/doutnac/Doutnac_south_MLS_2025.laz
 qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/doutnac/Doutnac_north_MLS_2025.laz
+
+
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh KB_MLS_2026_1.laz /storage/plzen1/home/krucek/data true 0.02 true
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/KB_MLS_2026_1.laz
+
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/KB_MLS_2026_2.laz
+
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/KB_MLS_2026_3.laz
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/KB_MLS_2026_4.laz
+
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh KB_MLS_2026_4.laz /storage/plzen1/home/krucek/data true 0.02 true
+
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh KB_MLS_2026_3.laz /storage/plzen1/home/krucek/data true 0.02 true
+
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh KB_MLS_2026_2.laz /storage/plzen1/home/krucek/data true 0.02 true
+
+
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_1.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_2.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_3.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_4.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_5.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=24:mem=64gb:scratch_local=150 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_6.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/ZL/ZL_MLS_2026_1.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/ZL/ZL_MLS_2026_2.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/ZL/ZL_MLS_2026_3.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/ZL/ZL_MLS_2026_4.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/ZL/ZL_MLS_2026_5.laz
+qsub -l select=1:ncpus=2:mem=4gb:scratch_local=10gb -l walltime=1:00:00 -- /storage/plzen1/home/krucek/scripts/save_first_coord.sh /storage/plzen1/home/krucek/data/ZL/ZL_MLS_2026_6.laz
+
+./submit_treeqsm_jobs.sh /storage/plzen1/home/krucek/data/gs-lcr/buchlovice
+
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_1.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_3.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_4.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_6.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true

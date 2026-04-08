@@ -38,3 +38,12 @@ qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=12:00:00 -- 
 qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh Michovky_mls.laz /storage/plzen1/home/krucek/data/michovky false 0.02 false Michovky1_01_traj.txt
 
 qsub -l select=1:ncpus=48:mem=256gb:scratch_local=300gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh Michovky_uls.laz /storage/plzen1/home/krucek/data/michovky false 0.02 false Michovky1_01_traj.txt
+
+qsub -l select=1:ncpus=24:mem=128gb:scratch_local=300gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh Michovky_mls.laz /storage/plzen1/home/krucek/data/michovky false 0.02 false Michovky1_01_traj.txt
+
+qsub -l select=1:ncpus=48:mem=256gb:scratch_local=500gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh Michovky_uls.laz /storage/plzen1/home/krucek/data/michovky false 0.02 false Michovky1_01_traj.txt
+
+qsub -l select=1:ncpus=24:mem=128gb:scratch_local=500gb -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_21.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+
+
+qsub -l select=1:ncpus=16:mem=48gb:scratch_local=128gb -l walltime=04:00:00 -- /storage/plzen1/home/krucek/scripts/voxelize.sh /storage/plzen1/home/krucek/data/zf_par_vox_0020.laz /storage/plzen1/home/krucek/data/zf_par_vox_TEST.laz 1.0
