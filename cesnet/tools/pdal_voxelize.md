@@ -23,4 +23,10 @@ export VOXEL_SIZE=10
 
 singularity exec -B $SCRATCHDIR/:/data ./cloudcompare.img CloudCompare -SILENT -O /data/in.laz -C_EXPORT_FMT LAS -SS SPATIAL "$VOXEL_SIZE" -SAVE_CLOUDS FILE "/data/cloud.laz"
 
-qsub -l select=1:ncpus=12:mem=16gb:scratch_local=20gb -l walltime=6:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize_firstPt.sh /storage/plzen1/home/krucek/data/ZF_cidla_mls_2025_LOff_merged_3035.laz /storage/plzen1/home/krucek/data/B2_vox_first.laz 10
+qsub -l select=1:ncpus=12:mem=16gb:scratch_local=20gb -l walltime=6:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize_firstPt.sh /storage/plzen1/home/krucek/data/ZF_cidla_mls_2025_LOff_merged_3035.laz /storage/plzen1/home/krucek/data/zf_par_vox_0005.laz 0.005
+
+qsub -l select=1:ncpus=12:mem=16gb:scratch_local=20gb -l walltime=6:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize_firstPt.sh /storage/plzen1/home/krucek/data/ZF_cidla_mls_2025_LOff_merged_3035.laz /storage/plzen1/home/krucek/data/zf_par_vox_0010.laz 0.010
+
+qsub -l select=1:ncpus=12:mem=16gb:scratch_local=20gb -l walltime=6:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize_firstPt.sh /storage/plzen1/home/krucek/data/ZF_cidla_mls_2025_LOff_merged_3035.laz /storage/plzen1/home/krucek/data/zf_par_vox_0020.laz 0.020
+
+qsub -l select=1:ncpus=12:mem=16gb:scratch_local=20gb -l walltime=6:00:00 -- /storage/plzen1/home/krucek/scripts/pdal_voxelize_firstPt.sh /storage/plzen1/home/krucek/data/ZF_cidla_mls_2025_LOff_merged_3035.laz /storage/plzen1/home/krucek/data/zf_par_vox_0050.laz 0.050

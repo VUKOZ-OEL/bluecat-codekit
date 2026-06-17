@@ -27,10 +27,10 @@ make -j
 
 # run 
 
-qsub -I -l select=1:ncpus=12:mem=16gb:scratch_local=32gb -l walltime=00:30:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process.sh /storage/plzen1/home/krucek/data/continousScanning_0001.zip
+qsub -l select=1:ncpus=12:mem=16gb:scratch_local=32gb -l walltime=02:30:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process_2.sh /storage/plzen1/home/krucek/data/continousScanning_0006.zip
 
 /storage/plzen1/home/krucek/HDMapping/build/bin
 dos2unix /storage/plzen1/home/krucek/scripts/hdmap_mls_process.sh
 /storage/plzen1/home/krucek/scripts/hdmap_mls_process.sh /storage/plzen1/home/krucek/data/continousScanning_0001.zip
 
-qsub -l select=1:ncpus=12:mem=16gb:scratch_local=32gb -l walltime=00:30:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process.sh /storage/plzen1/home/krucek/data/continousScanning_0001.zip
+qsub -l select=1:ncpus=12:mem=32gb:scratch_local=32gb -l walltime=02:00:00 -- /storage/plzen1/home/krucek/scripts/hdmap_process.sh /storage/plzen1/home/krucek/data/continousScanning_0001.zip

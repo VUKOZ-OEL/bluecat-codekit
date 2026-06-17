@@ -1,0 +1,1 @@
+for /d %%D in (*) do powershell -NoProfile -Command "Compress-Archive -Path '%%D\*' -DestinationPath '%%D.zip' -Force"
