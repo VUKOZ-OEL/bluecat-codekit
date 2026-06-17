@@ -184,3 +184,8 @@ qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /s
 qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_3.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
 qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_4.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
 qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /storage/plzen1/home/krucek/scripts/segment.sh ZL_MLS_2026_6.laz /storage/plzen1/home/krucek/data/ZL true 0.02 true
+
+
+qsub -l select=1:ncpus=8:mem=24gb:scratch_local=50 -l walltime=01:00:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process_text_detection.sh /storage/plzen1/home/krucek/data/continousScanning_0018.zip
+
+qsub -l select=1:ncpus=8:mem=24gb:scratch_local=50 -l walltime=01:00:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process_2.sh /storage/plzen1/home/krucek/data/continousScanning_0018.zip
