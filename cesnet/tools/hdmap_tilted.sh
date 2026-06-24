@@ -23,7 +23,7 @@ OUTPUT_ZIP="${DATA_DIRNAME}/${DATA_BASENAME}_hdmapping_rawslam.zip"
 ########################################
 # USER SETTINGS
 ########################################
-SO_SRC_DIR="/storage/plzen1/home/krucek/HDMapping/build/bin/Release"
+SO_SRC_DIR="/storage/plzen1/home/krucek/github/hdmap2hpcpy/build/bin/Release"
 
 ########################################
 # ENV
@@ -114,6 +114,12 @@ def newest_session_mjs(base_dir):
 # 1) Lidar odometry
 # ---------------------------
 params = lo.LidarOdometryParams()
+
+# TILT
+
+params.motion_model_correction_om_deg = 0.0
+params.motion_model_correction_fi_deg = -90.0
+params.motion_model_correction_ka_deg = 0.0
 
 # Forestry preset
 params.decimation = 0.005
