@@ -1,7 +1,16 @@
 ## > https://profile.e-infra.cz/profile/
 ## > https://perun.einfra.cesnet.cz/
 
+<<<<<<< Updated upstream
 @
+=======
+### Grant acces to shard folder to whole group:
+```
+chmod -R g+rw /data/shared
+chmod g+s /data/shared
+umask 002
+```
+>>>>>>> Stashed changes
 
 ## code used to run on cesnet infrastructure
 
@@ -62,6 +71,7 @@ chmod -R ugo+rwx /storage/projects2/InterCOST
 
 qsub -l select=1:ncpus=16:mem=128gb:scratch_local=200gb -l walltime=24:00:00 -- /storage/plzen1/home/krucek/WFDP/segment.sh WFDP_q5.laz /storage/plzen1/home/krucek/WFDP
 
+<<<<<<< Updated upstream
 qsub -l select=1:ncpus=6:mem=24gb:scratch_local=25gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh WFDP_2021_q2_001.laz /storage/projects2/InterCOST/segmentation/raw_data true 0.02 true
 
 
@@ -189,3 +199,15 @@ qsub -l select=1:ncpus=48:mem=128gb:scratch_local=250 -l walltime=12:00:00 -- /s
 qsub -l select=1:ncpus=8:mem=24gb:scratch_local=50 -l walltime=01:00:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process_text_detection.sh /storage/plzen1/home/krucek/data/continousScanning_0018.zip
 
 qsub -l select=1:ncpus=8:mem=24gb:scratch_local=50 -l walltime=01:00:00 -- /storage/plzen1/home/krucek/scripts/hdmap_mls_process_2.sh /storage/plzen1/home/krucek/data/continousScanning_0018.zip
+=======
+SLP_Rudice_vox002_clip_gpst.laz
+qsub -l select=1:ncpus=6:mem=64gb:scratch_local=100gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh SLP_Rudice_vox002_clip_gpst.laz /storage/plzen1/home/krucek/gs-lcr
+
+qsub -l select=1:ncpus=16:mem=128gb:scratch_local=200gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh Buchlovice.laz /storage/plzen1/home/krucek/gs-lcr true 0.02 true
+
+qsub -l select=1:ncpus=16:mem=128gb:scratch_local=200gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh Krivoklat.laz /storage/plzen1/home/krucek/gs-lcr true 0.02 true
+
+qsub -l select=1:ncpus=4:mem=64gb:scratch_local=100gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh SLP_Klepacov1.laz /storage/plzen1/home/krucek/gs-lcr true 0.02 true
+
+qsub -l select=1:ncpus=4:mem=64gb:scratch_local=100gb -l walltime=12:00:00 -- /storage/projects2/InterCOST/segment.sh SLP_Klepacov2.laz /storage/plzen1/home/krucek/gs-lcr true 0.02 true
+>>>>>>> Stashed changes

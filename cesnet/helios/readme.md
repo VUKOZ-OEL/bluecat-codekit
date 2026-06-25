@@ -1,9 +1,9 @@
 singularity exec -B $SCRATCHDIR/:/data ./lastools.img las2txt -i rudice_sample.laz -o data.xyz -parse xyz
 singularity exec -B $SCRATCHDIR/:/data ./lastools.img txt2las -i data.xyz -o olas.laz
 
-qsub -l select=1:ncpus=4:mem=24gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/projects2/InterCOST/simulate.sh RN_4_N.laz als_RN_4_N.xml xyzloader_RN_4_N.xml /storage/projects2/InterCOST/simulations/RN
+qsub -l select=1:ncpus=8:mem=24gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/projects2/InterCOST/simulate.sh RN_4_N.laz als_RN_4_N.xml xyzloader_RN_4_N.xml /storage/projects2/InterCOST/simulations/RN
 
-qsub -l select=1:ncpus=4:mem=24gb:scratch_local=150gb -l walltime=24:00:00 -- /storage/projects2/InterCOST/simulate.sh RN_4_N.laz xyzloader_RN_4_N.xml als_RN_4_N.xml /storage/projects2/InterCOST/simulations/RN
+
 
 
 singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img raywrap segments/cloud_segmented_320.ply downwards 5.0
@@ -23,10 +23,12 @@ cp segments/cloud_segmented_320_mesh.ply /storage/projects2/InterCOST/segmentati
 
 cp segments/cloud_segmented_320.ply /storage/projects2/InterCOST/segmentation/cloud_segmented_320.ply
 
-qsub -I select=1:ncpus=4:mem=24gb:scratch_local=150gb -l walltime=1:00:00 
+qsub -l select=1:ncpus=16:mem=34gb:scratch_local=50gb -l walltime=6:00:00 -- /storage/projects2/InterCOST/simulations/vox001_centered_00min/simulate_.sh RN_3_N_001_c00.laz als_.xml xyzloader_.xml /storage/projects2/InterCOST/simulations/vox001_centered_00min
 
-INPUT_DATA=RN_4_N.laz
-SURVEY_XML=als_RN_4_N.xml
-LOADER_XML=xyzloader_RN_4_N.xml
-DATADIR=/storage/projects2/InterCOST/simulations/RN
+qsub -I -l select=1:ncpus=2:mem=2gb:scratch_local=5gb -l walltime=2:00:00
+
+INPUT_DATA=RN_4_N_nth999_c00.laz
+SURVEY_XML=als_.xml
+LOADER_XML=xyzloader_.xml
+DATADIR=/storage/projects2/InterCOST/simulations/vox001_centered_00min
 
