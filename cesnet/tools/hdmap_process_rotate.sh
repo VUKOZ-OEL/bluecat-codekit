@@ -31,6 +31,23 @@ SO_SRC_DIR="/storage/plzen1/home/krucek/HDMapping/build/bin/Release"
 # R_y(+90) verified on imu data: gravity moves from -X to +Z.
 export DEROT_AXIS="${DEROT_AXIS:-Y}"
 export DEROT_ANGLE="${DEROT_ANGLE:-90}"
+# Method:
+#   laz (default)  - The validated path: rewrites every LAZ by R with laspy and
+#                    rotates the IMU CSVs by R. Needs numpy + laspy available.
+#                    Make laspy available in ONE of two ways:
+#                      * DEROT_VENV=/path/to/venv  (pre-made user venv, preferred)
+#                      * DEROT_PIP_INSTALL=1        (pip install in-job; needs net)
+#   calib          - No external packages: IMU rotated in CSV (stdlib) and points
+#                    rotated by the pipeline via a generated calibration.json.
+#                    Use only for single-LiDAR data with a .sn file and no
+#                    existing calibration json.
+export DEROT_METHOD="${DEROT_METHOD:-laz}"
+# Path to a pre-made virtualenv that has numpy + laspy (sourced only for the
+# derotation step, in a subshell, so it does not affect the SLAM .so imports).
+export DEROT_VENV="${DEROT_VENV:-}"
+# Set to 1 to attempt 'pip install --user' inside the job (only if compute
+# nodes have internet). Ignored if DEROT_VENV is set and works.
+export DEROT_PIP_INSTALL="${DEROT_PIP_INSTALL:-0}"
 
 # --- Loop closure (variant B: pre-seed tail onto start, then pose-graph SLAM) ---
 # Apply loop closure when the survey returns near its start. Because step-1
@@ -55,10 +72,15 @@ export TERM=dumb
 ########################################
 module add python/3.9.12-gcc-10.2.1-rg2lpmk
 
-# numpy + laspy are needed for the derotation step (rotating LAZ point clouds).
-# Best-effort install; if your cluster nodes have no internet, pre-install these
-# into the environment beforehand.
-python3 -m pip install --user --quiet numpy "laspy[laszip]" 2>/dev/null || true
+# laspy for the default 'laz' derotation. Make it available in ONE of these ways:
+#   1) Pre-made venv (preferred), created once from a login node:
+#        module add python/3.9.12-gcc-10.2.1-rg2lpmk
+#        python3 -m venv $HOME/hdmap_venv
+#        source $HOME/hdmap_venv/bin/activate
+#        pip install numpy "laspy[lazrs]"
+#      then submit with DEROT_VENV=$HOME/hdmap_venv
+#   2) In-job pip (only if compute nodes have internet): DEROT_PIP_INSTALL=1
+#   3) DEROT_METHOD=calib (no packages at all)
 
 ########################################
 # SCRATCH
@@ -108,15 +130,15 @@ echo "=== DATA ROOT: ${DATA_ROOT}"
 # unchanged. Step 1 then runs on ROTATED_DIR.
 DEROT_SCRIPT="${WORKDIR}/derotate.py"
 cat > "${DEROT_SCRIPT}" <<'PY'
+import json
 import math
 import os
 import sys
 from pathlib import Path
 
-import numpy as np
-
 AXIS = os.environ.get("DEROT_AXIS", "Y").upper()
 ANGLE = float(os.environ.get("DEROT_ANGLE", "90"))
+METHOD = os.environ.get("DEROT_METHOD", "calib").lower()
 IN_DIR = Path(os.environ["DATA_ROOT"])
 OUT_DIR = Path(os.environ["ROTATED_DIR"])
 
@@ -125,14 +147,19 @@ def rotation_matrix(axis, angle_deg):
     a = math.radians(angle_deg)
     c, s = math.cos(a), math.sin(a)
     if axis == "X":
-        return np.array([[1, 0, 0], [0, c, -s], [0, s, c]], float)
+        return [[1, 0, 0], [0, c, -s], [0, s, c]]
     if axis == "Y":
-        return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]], float)
+        return [[c, 0, s], [0, 1, 0], [-s, 0, c]]
     if axis == "Z":
-        return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], float)
+        return [[c, -s, 0], [s, c, 0], [0, 0, 1]]
     raise ValueError("axis must be X, Y or Z")
 
 
+def matvec(M, v):
+    return [M[r][0] * v[0] + M[r][1] * v[1] + M[r][2] * v[2] for r in range(3)]
+
+
+# --- IMU rotation: pure stdlib, no numpy ----------------------------------
 def derotate_imu_csv(src, dst, R):
     lines = Path(src).read_text().splitlines()
     if not lines:
@@ -146,60 +173,167 @@ def derotate_imu_csv(src, dst, R):
         if not ln.strip():
             continue
         t = ln.split()
-        g = R @ np.array([float(t[gi[0]]), float(t[gi[1]]), float(t[gi[2]])])
-        a = R @ np.array([float(t[ai[0]]), float(t[ai[1]]), float(t[ai[2]])])
+        g = matvec(R, [float(t[gi[0]]), float(t[gi[1]]), float(t[gi[2]])])
+        a = matvec(R, [float(t[ai[0]]), float(t[ai[1]]), float(t[ai[2]])])
         for k, idx in enumerate(gi):
-            t[idx] = repr(float(g[k]))
+            t[idx] = repr(g[k])
         for k, idx in enumerate(ai):
-            t[idx] = repr(float(a[k]))
+            t[idx] = repr(a[k])
         out.append(" ".join(t))
     Path(dst).write_text("\n".join(out) + "\n")
 
 
-def derotate_laz(src, dst, R):
-    import laspy
-    las = laspy.read(str(src))
-    xyz = np.vstack([las.x, las.y, las.z]).T
-    xyz = xyz @ R.T
-    las.x, las.y, las.z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
-    las.write(str(dst))
+def find_sn_file(d):
+    for f in d.iterdir():
+        if f.is_file() and f.suffix.lower() == ".sn":
+            return f
+    return None
 
 
-def main():
-    R = rotation_matrix(AXIS, ANGLE)
-    print(f"=== DEROTATION R_{AXIS}({ANGLE:g}):\n{np.array2string(R, precision=3, suppress_small=True)}")
+def find_existing_calib(d):
+    for f in d.iterdir():
+        if not f.is_file():
+            continue
+        ext = f.suffix.lower()
+        stem = f.stem.lower()
+        if ext == ".mjc":
+            return f
+        if ext == ".json" and not (stem.startswith("status") or
+                                   stem.startswith("cam0") or
+                                   stem.startswith("cam1")):
+            try:
+                if "calibration" in json.load(open(f)):
+                    return f
+            except Exception:
+                pass
+    return None
+
+
+def parse_sn(sn_path):
+    pairs = []
+    for line in Path(sn_path).read_text().splitlines():
+        p = line.split()
+        if len(p) >= 2:
+            pairs.append((int(p[0]), p[1]))
+    return pairs
+
+
+# --- METHOD: calib (no deps) ----------------------------------------------
+def run_calib(R):
+    sn = find_sn_file(IN_DIR)
+    if sn is None:
+        sys.exit("ERROR [calib]: no .sn file in data. Cannot rotate points via "
+                 "calibration. Use DEROT_METHOD=laz (install laspy) instead.")
+    existing = find_existing_calib(IN_DIR)
+    if existing is not None:
+        sys.exit(f"ERROR [calib]: existing calibration '{existing.name}' found "
+                 "(multi-LiDAR?). Overriding it would break inter-sensor "
+                 "calibration. Use DEROT_METHOD=laz (install laspy) instead.")
+    pairs = parse_sn(sn)
+    if not pairs:
+        sys.exit(f"ERROR [calib]: .sn file '{sn.name}' is empty/unparrseable.")
+
+    # rotation as a 4x4 row-major matrix (translation 0)
+    data = [R[0][0], R[0][1], R[0][2], 0.0,
+            R[1][0], R[1][1], R[1][2], 0.0,
+            R[2][0], R[2][1], R[2][2], 0.0,
+            0.0, 0.0, 0.0, 1.0]
+    sns = sorted({s for _, s in pairs})
+    cal = {s: {"order": "ROW", "inverted": "FALSE", "data": data} for s in sns}
+    imu_sn = dict(sorted(pairs))[min(i for i, _ in pairs)]  # SN of lowest id
+    calib_json = {"calibration": cal, "imuToUse": imu_sn}
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    n_imu = n_copy = 0
+    for f in sorted(IN_DIR.iterdir()):
+        if not f.is_file():
+            continue
+        nm = f.name.lower()
+        dst = OUT_DIR / f.name
+        if nm.startswith("imu") and nm.endswith(".csv"):
+            derotate_imu_csv(f, dst, R)
+            n_imu += 1
+        else:
+            dst.write_bytes(f.read_bytes())  # LAZ copied as-is; rotated by pipeline
+            n_copy += 1
+    (OUT_DIR / "calibration.json").write_text(json.dumps(calib_json, indent=2))
+    print(f"=== DEROTATION [calib]: rotated {n_imu} imu csv (stdlib); wrote "
+          f"calibration.json rotating points by R for SNs {sns}; imuToUse={imu_sn}; "
+          f"copied {n_copy} files")
 
+
+# --- METHOD: laz (laspy) ---------------------------------------------------
+def run_laz(R):
+    try:
+        import numpy as np
+        import laspy
+    except Exception as e:
+        sys.exit(f"ERROR [laz]: numpy/laspy not importable ({e}). Install once "
+                 "on a login node: pip install --user numpy 'laspy[lazrs]'  — or "
+                 "use the default DEROT_METHOD=calib (no packages needed).")
+    Rn = np.array(R, float)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     n_imu = n_laz = n_copy = 0
     for f in sorted(IN_DIR.iterdir()):
         if not f.is_file():
-            # copy sub-directories verbatim (rare for mandeye raw)
             continue
-        name = f.name.lower()
+        nm = f.name.lower()
         dst = OUT_DIR / f.name
-        if name.startswith("imu") and name.endswith(".csv"):
+        if nm.startswith("imu") and nm.endswith(".csv"):
             derotate_imu_csv(f, dst, R)
             n_imu += 1
-        elif name.endswith(".laz") or name.endswith(".las"):
-            derotate_laz(f, dst, R)
+        elif nm.endswith(".laz") or nm.endswith(".las"):
+            las = laspy.read(str(f))
+            xyz = np.vstack([las.x, las.y, las.z]).T @ Rn.T
+            las.x, las.y, las.z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
+            las.write(str(dst))
             n_laz += 1
         else:
             dst.write_bytes(f.read_bytes())
             n_copy += 1
-    print(f"=== DEROTATION done: {n_imu} imu csv, {n_laz} laz/las, {n_copy} copied")
+    print(f"=== DEROTATION [laz]: {n_imu} imu csv, {n_laz} laz/las, {n_copy} copied")
     if n_laz == 0:
         print("WARNING: no LAZ/LAS point files found to rotate!", file=sys.stderr)
+
+
+def main():
+    R = rotation_matrix(AXIS, ANGLE)
+    print(f"=== DEROTATION method={METHOD} R_{AXIS}({ANGLE:g}) = {R}")
+    if METHOD == "calib":
+        run_calib(R)
+    elif METHOD == "laz":
+        run_laz(R)
+    else:
+        sys.exit(f"ERROR: unknown DEROT_METHOD '{METHOD}' (use 'calib' or 'laz')")
 
 
 if __name__ == "__main__":
     main()
 PY
 
-echo "=== RUN DEROTATION ==="
-python3 "${DEROT_SCRIPT}" 2>&1 | tee "${WORKDIR}/derotate.log"
+echo "=== RUN DEROTATION (method=${DEROT_METHOD}) ==="
+# Run in a subshell so an activated venv does NOT leak into the SLAM steps
+# (which must use the module python that the Release .so files were built for).
+(
+    if [[ "${DEROT_METHOD}" == "laz" ]]; then
+        if [[ -n "${DEROT_VENV}" && -f "${DEROT_VENV}/bin/activate" ]]; then
+            echo "=== Using derotation venv: ${DEROT_VENV}"
+            # shellcheck disable=SC1090
+            source "${DEROT_VENV}/bin/activate"
+        elif [[ "${DEROT_PIP_INSTALL}" == "1" ]]; then
+            echo "=== Attempting in-job pip install of numpy + laspy ..."
+            python3 -m pip install --user --quiet numpy "laspy[lazrs]" || \
+                echo "WARNING: in-job pip install failed (no internet?)."
+        fi
+    fi
+    python3 "${DEROT_SCRIPT}"
+) 2>&1 | tee "${WORKDIR}/derotate.log"
 DEROT_EXIT=${PIPESTATUS[0]}
 if [[ ${DEROT_EXIT} -ne 0 ]]; then
-    echo "ERROR: Derotation failed (laspy installed?). Aborting." >&2
+    echo "ERROR: Derotation failed (see derotate.log above)." >&2
+    echo "  For DEROT_METHOD=laz, provide laspy via DEROT_VENV=/path/to/venv" >&2
+    echo "  (pre-made on a login node) or DEROT_PIP_INSTALL=1 if nodes have net." >&2
+    echo "  Or fall back to DEROT_METHOD=calib (no packages needed)." >&2
     exit ${DEROT_EXIT}
 fi
 
