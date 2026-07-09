@@ -1,9 +1,9 @@
-#! bin/bash
+#!/bin/bash
+set -euo pipefail
 
-chgrp -R intercost /storage/projects2/InterCOST
-chmod g+s /storage/projects2/InterCOST
+TARGET_DIR="/storage/projects2/InterCOST"
 
+chgrp -R intercost "$TARGET_DIR"
+chmod g+s "$TARGET_DIR"
 
-#!/bin/sh
-#PBS -W umask=002
-#PBS -W group_list=intercost
+echo "Applied intercost group rights to $TARGET_DIR"

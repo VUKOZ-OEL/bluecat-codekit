@@ -1,20 +1,27 @@
 #!/bin/bash
+set -euo pipefail
 
-# Nastav cestu k adresáři se soubory
-export FILE_IN=$1
+source "$(dirname "$0")/common.sh"
 
-cd $SCRATCHDIR
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <input.laz>"
+  exit 1
+fi
 
-module add singul/
-cp /storage/plzen1/home/krucek/singularity_img/pdal.img $SCRATCHDIR
+INPUT_FILE="$1"
+OUTPUT_FILE="${INPUT_FILE}.first"
+LOG_FILE="${OUTPUT_FILE}.log"
 
-cp $FILE_IN $SCRATCHDIR/cloud.laz
+cesnet::require_file "$INPUT_FILE"
+cesnet::enter_scratch
+cesnet::load_modules
 
-    
-singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal info -p 0 cloud.laz > cloud.first
+cesnet::copy_first_existing "$SCRATCHDIR/pdal.img" \
+  /storage/plzen1/home/krucek/singularity_img/pdal.img \
+  /storage/projects2/InterCOST/singularity_img/pdal.img
 
-cp cloud.first "${FILE_IN}.first"
-    
+cp "$INPUT_FILE" "$SCRATCHDIR/cloud.laz"
+singularity exec -B "$SCRATCHDIR":/data ./pdal.img pdal info -p 0 /data/cloud.laz > cloud.first
+cp cloud.first "$OUTPUT_FILE"
 
-
-clean_scratch
+cesnet::clean_scratch

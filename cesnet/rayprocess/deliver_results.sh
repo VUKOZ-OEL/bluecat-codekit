@@ -1,23 +1,18 @@
+#!/bin/bash
+set -euo pipefail
 
-log_message "deliver results start"
+source "$(dirname "$0")/../common.sh"
 
+cesnet::require_env DATADIR SOURCE_DATA
 
+if [[ -f cloud_trees_info.txt ]]; then
+  cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt"
+fi
 
-cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt" &>> >(log_message)
+[[ -f "$LOG_FILE" ]] && cp "$LOG_FILE" log/ 2>/dev/null || true
 
-cp $LOG_FILE log
-
-cp $LOG_FILE log
-
-# Create a ZIP file containing all results
 ZIP_NAME="${SOURCE_DATA}_results.zip"
+zip -r "$ZIP_NAME" . >/dev/null
+cp "$ZIP_NAME" "$DATADIR"
 
-log_message "zip file name: $ZIP_NAME"
-
-zip -r "$ZIP_NAME" . 
-
-echo "$(date) compressed" >> $LOG_FILE
-
-# Copy the ZIP file to $DATADIR
-cp "$ZIP_NAME" $DATADIR
-echo "$(date) Copied $ZIP_NAME to $DATADIR" >> $LOG_FILE
+cesnet::log INFO "Results delivered to $DATADIR/$ZIP_NAME"
