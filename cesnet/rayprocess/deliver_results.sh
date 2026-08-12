@@ -4,6 +4,8 @@ log_message "deliver results start"
 
 
 cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt" &>> >(log_message)
+cp "$SOURCE_DATA.treeInfo.geojson" "$DATADIR/$SOURCE_DATA.treeInfo.geojson" &>> >(log_message)
+cp "$SOURCE_DATA.firs.json" "$DATADIR/$SOURCE_DATA.firs.json" &>> >(log_message)
 
 cp $LOG_FILE log
 

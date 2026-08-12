@@ -7,11 +7,24 @@ SEGMENTED_PLY="cloud_segmented.ply"
 TREES_TXT="cloud_trees.txt"
 TREES_MESH_PLY="cloud_trees_mesh.ply"
 LEAVES_PLY="cloud_leaves.ply"
+FIRST_POINT_JSON="${SOURCE_DATA}.firs.json"
+TREE_INFO_GEOJSON="${SOURCE_DATA}.treeInfo.geojson"
+
+source georeference_results.sh
 
 
 echo "$(date) pdal processing start" >> $LOG_FILE
 singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal pipeline /data/pdal_pipeline.json
 echo "$(date) pdal processing end" >> $LOG_FILE
+
+# RayCloudTools shifts this exact cloud by its first point when
+# --remove_start_pos is used. Persist that translation for the results and
+# reuse it below to restore absolute coordinates.
+save_first_point_coordinates "cloud.laz" "$FIRST_POINT_JSON" || {
+    echo "$(date) failed to save first-point coordinates" >> "$LOG_FILE"
+    return 1
+}
+echo "$(date) first-point coordinates saved to $FIRST_POINT_JSON" >> "$LOG_FILE"
 
 
 
@@ -19,7 +32,8 @@ echo "$(date) raycloudtools processing start" >> $LOG_FILE
 # RUN raycloudtools in singularity to process the data
 
 if [ "$TRAJECTORY" != "false" ]; then
-    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayimport cloud.laz $TRAJECTORY
+    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img \
+        rayimport cloud.laz "$TRAJECTORY" --remove_start_pos
 else
     singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayimport cloud.laz ray 0,0,-10 --remove_start_pos
 fi
@@ -71,6 +85,12 @@ echo "$(date) leaves extracted" >> $LOG_FILE
 singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img treeinfo $TREES_TXT
 echo "$(date) treeinfo extracted" >> $LOG_FILE
 
+create_tree_info_geojson "cloud_trees_info.txt" "$TREE_INFO_GEOJSON" || {
+    echo "$(date) failed to create georeferenced tree-info GeoJSON" >> "$LOG_FILE"
+    return 1
+}
+echo "$(date) georeferenced tree info saved to $TREE_INFO_GEOJSON" >> "$LOG_FILE"
+
 echo "lof in SCRATCHDIR:" >> $LOG_FILE
 echo "$(ls -lh)" >> $LOG_FILE
 echo "" >> $LOG_FILE
@@ -83,12 +103,20 @@ singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img raysplit segments/$SE
 
 echo "$(date) segments extracted" >> $LOG_FILE
 
-for segment_file in ${SEGMENT_DIR}/*.ply; do
-    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayrender "$segment_file" right ends
-    segment_laz="${segment_file%.ply}.laz"
-    segment_traj="${segment_file%.ply}.txt"
-    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayexport $segment_file $segment_laz $segment_traj
-    singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img raywrap "$segment_file" inwards 1.0
+for segment_file in "$SEGMENT_DIR"/*.ply; do
+    segment_name=$(basename "$segment_file")
+    segment_relative="segments/$segment_name"
+    segment_laz="${segment_relative%.ply}.laz"
+    segment_traj="${segment_relative%.ply}.txt"
+
+    singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayrender "/data/$segment_relative" right ends
+    singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayexport \
+        "/data/$segment_relative" "/data/$segment_laz" "/data/$segment_traj"
+    translate_laz_to_original_coordinates "$segment_laz" || {
+        echo "$(date) failed to restore coordinates in $segment_laz" >> "$LOG_FILE"
+        return 1
+    }
+    singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img raywrap "/data/$segment_relative" inwards 1.0
     #echo "Rendered image for $segment_file" >> $LOG_FILE
 done
 
