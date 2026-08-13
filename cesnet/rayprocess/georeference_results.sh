@@ -56,6 +56,35 @@ save_first_point_coordinates() {
     export FIRST_POINT_X FIRST_POINT_Y FIRST_POINT_Z
 }
 
+save_las_scale_and_offset() {
+    local cloud_file="$1"
+    local raw_metadata="cloud.las-metadata.pdal.json"
+
+    singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        pdal info --metadata "/data/$cloud_file" > "$raw_metadata" || return 1
+
+    LAS_SCALE_X=$(extract_first_point_dimension "$raw_metadata" scale_x)
+    LAS_SCALE_Y=$(extract_first_point_dimension "$raw_metadata" scale_y)
+    LAS_SCALE_Z=$(extract_first_point_dimension "$raw_metadata" scale_z)
+    LAS_OFFSET_X=$(extract_first_point_dimension "$raw_metadata" offset_x)
+    LAS_OFFSET_Y=$(extract_first_point_dimension "$raw_metadata" offset_y)
+    LAS_OFFSET_Z=$(extract_first_point_dimension "$raw_metadata" offset_z)
+    rm -f "$raw_metadata"
+
+    if ! is_json_number "$LAS_SCALE_X" || \
+       ! is_json_number "$LAS_SCALE_Y" || \
+       ! is_json_number "$LAS_SCALE_Z" || \
+       ! is_json_number "$LAS_OFFSET_X" || \
+       ! is_json_number "$LAS_OFFSET_Y" || \
+       ! is_json_number "$LAS_OFFSET_Z"; then
+        echo "Unable to read LAS scale and offset from $cloud_file" >&2
+        return 1
+    fi
+
+    export LAS_SCALE_X LAS_SCALE_Y LAS_SCALE_Z
+    export LAS_OFFSET_X LAS_OFFSET_Y LAS_OFFSET_Z
+}
+
 translate_laz_to_original_coordinates() {
     local laz_file="$1"
     local directory
@@ -71,13 +100,13 @@ translate_laz_to_original_coordinates() {
     singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
         pdal translate "/data/$laz_file" "/data/$temporary_file" transformation \
         --filters.transformation.matrix="$matrix" \
-        --writers.las.forward=all \
-        --writers.las.scale_x=auto \
-        --writers.las.scale_y=auto \
-        --writers.las.scale_z=auto \
-        --writers.las.offset_x=auto \
-        --writers.las.offset_y=auto \
-        --writers.las.offset_z=auto || return 1
+        --writers.las.forward=header \
+        --writers.las.scale_x="$LAS_SCALE_X" \
+        --writers.las.scale_y="$LAS_SCALE_Y" \
+        --writers.las.scale_z="$LAS_SCALE_Z" \
+        --writers.las.offset_x="$LAS_OFFSET_X" \
+        --writers.las.offset_y="$LAS_OFFSET_Y" \
+        --writers.las.offset_z="$LAS_OFFSET_Z" || return 1
 
     mv "$temporary_file" "$laz_file"
 }

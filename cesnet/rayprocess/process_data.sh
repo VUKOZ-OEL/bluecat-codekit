@@ -7,7 +7,7 @@ SEGMENTED_PLY="cloud_segmented.ply"
 TREES_TXT="cloud_trees.txt"
 TREES_MESH_PLY="cloud_trees_mesh.ply"
 LEAVES_PLY="cloud_leaves.ply"
-FIRST_POINT_JSON="${SOURCE_DATA}.firs.json"
+FIRST_POINT_JSON="${SOURCE_DATA}.first.json"
 TREE_INFO_GEOJSON="${SOURCE_DATA}.treeInfo.geojson"
 
 source georeference_results.sh
@@ -25,6 +25,14 @@ save_first_point_coordinates "cloud.laz" "$FIRST_POINT_JSON" || {
     return 1
 }
 echo "$(date) first-point coordinates saved to $FIRST_POINT_JSON" >> "$LOG_FILE"
+
+# All exported tree LAZ files retain this one common LAS quantisation, taken
+# from the cloud processed by RayCloudTools. Do not use per-tree auto values.
+save_las_scale_and_offset "cloud.laz" || {
+    echo "$(date) failed to read LAS scale and offset" >> "$LOG_FILE"
+    return 1
+}
+echo "$(date) LAS scale and offset saved for tree exports" >> "$LOG_FILE"
 
 
 
