@@ -31,16 +31,6 @@ save_first_point_coordinates "cloud.laz" "$FIRST_POINT_JSON" || {
 }
 echo "$(date) first-point coordinates saved to $FIRST_POINT_JSON" >> "$LOG_FILE"
 
-# All exported tree LAZ files retain this one common LAS quantisation, taken
-# from the cloud processed by RayCloudTools. Do not use per-tree auto values.
-save_las_scale_and_offset "cloud.laz" || {
-    echo "$(date) failed to read LAS scale and offset" >> "$LOG_FILE"
-    return 1
-}
-echo "$(date) LAS scale and offset saved for tree exports" >> "$LOG_FILE"
-
-
-
 echo "$(date) raycloudtools processing start" >> $LOG_FILE
 # RUN raycloudtools in singularity to process the data
 
@@ -120,10 +110,17 @@ for segment_file in "$SEGMENT_DIR"/*.ply; do
     segment_name=$(basename "$segment_file")
     segment_relative="segments/$segment_name"
     segment_laz="${segment_relative%.ply}.laz"
+    segment_traj="${segment_relative%.ply}.txt"
 
     singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayrender "/data/$segment_relative" right ends
-    export_ply_to_georeferenced_laz "$segment_relative" "$segment_laz" || {
-        echo "$(date) failed to export georeferenced $segment_laz" >> "$LOG_FILE"
+    if ! singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayexport \
+        "/data/$segment_relative" "/data/$segment_laz" "/data/$segment_traj"; then
+        georeference_log "ERROR: rayexport failed for $segment_relative"
+        return 1
+    fi
+    georeference_log "rayexport completed without coordinate modification: $segment_relative -> $segment_laz"
+    georeference_rayexport_laz "$segment_laz" || {
+        echo "$(date) failed to georeference $segment_laz" >> "$LOG_FILE"
         return 1
     }
     singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img raywrap "/data/$segment_relative" inwards 1.0
