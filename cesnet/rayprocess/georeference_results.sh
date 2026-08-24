@@ -5,6 +5,17 @@
 # required by this pipeline: PDAL (inside pdal.img), awk and standard shell
 # utilities.
 
+georeference_log() {
+    local message="$*"
+    if declare -F log_message >/dev/null; then
+        log_message "[georeference] $message"
+    elif [ -n "${LOG_FILE:-}" ]; then
+        echo "$(date) [georeference] $message" >> "$LOG_FILE"
+    else
+        echo "$(date) [georeference] $message" >&2
+    fi
+}
+
 extract_first_point_dimension() {
     local info_file="$1"
     local dimension="$2"
@@ -35,8 +46,12 @@ save_first_point_coordinates() {
     local output_file="$2"
     local raw_info="cloud.first-point.pdal.json"
 
-    singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal info -p 0 "/data/$cloud_file" > "$raw_info" || return 1
+    georeference_log "reading first point from $cloud_file"
+    if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        pdal info -p 0 "/data/$cloud_file" > "$raw_info"; then
+        georeference_log "ERROR: pdal info -p 0 failed for $cloud_file"
+        return 1
+    fi
 
     FIRST_POINT_X=$(extract_first_point_dimension "$raw_info" X)
     FIRST_POINT_Y=$(extract_first_point_dimension "$raw_info" Y)
@@ -47,6 +62,7 @@ save_first_point_coordinates() {
        ! is_json_number "$FIRST_POINT_Y" || \
        ! is_json_number "$FIRST_POINT_Z"; then
         echo "Unable to read XYZ of the first point from $cloud_file" >&2
+        georeference_log "ERROR: invalid first-point XYZ (X=$FIRST_POINT_X, Y=$FIRST_POINT_Y, Z=$FIRST_POINT_Z)"
         return 1
     fi
 
@@ -54,14 +70,19 @@ save_first_point_coordinates() {
         "$FIRST_POINT_X" "$FIRST_POINT_Y" "$FIRST_POINT_Z" > "$output_file"
 
     export FIRST_POINT_X FIRST_POINT_Y FIRST_POINT_Z
+    georeference_log "first point: X=$FIRST_POINT_X Y=$FIRST_POINT_Y Z=$FIRST_POINT_Z; wrote $output_file"
 }
 
 save_las_scale_and_offset() {
     local cloud_file="$1"
     local raw_metadata="cloud.las-metadata.pdal.json"
 
-    singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal info --metadata "/data/$cloud_file" > "$raw_metadata" || return 1
+    georeference_log "reading LAS scale and offset from $cloud_file"
+    if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        pdal info --metadata "/data/$cloud_file" > "$raw_metadata"; then
+        georeference_log "ERROR: pdal info --metadata failed for $cloud_file"
+        return 1
+    fi
 
     LAS_SCALE_X=$(extract_first_point_dimension "$raw_metadata" scale_x)
     LAS_SCALE_Y=$(extract_first_point_dimension "$raw_metadata" scale_y)
@@ -78,11 +99,30 @@ save_las_scale_and_offset() {
        ! is_json_number "$LAS_OFFSET_Y" || \
        ! is_json_number "$LAS_OFFSET_Z"; then
         echo "Unable to read LAS scale and offset from $cloud_file" >&2
+        georeference_log "ERROR: invalid LAS scale/offset read from $cloud_file"
         return 1
     fi
 
     export LAS_SCALE_X LAS_SCALE_Y LAS_SCALE_Z
     export LAS_OFFSET_X LAS_OFFSET_Y LAS_OFFSET_Z
+    georeference_log "LAS quantisation: scale=($LAS_SCALE_X,$LAS_SCALE_Y,$LAS_SCALE_Z) offset=($LAS_OFFSET_X,$LAS_OFFSET_Y,$LAS_OFFSET_Z)"
+}
+
+log_laz_state() {
+    local laz_file="$1"
+    local stage="$2"
+    local safe_name
+    local diagnostic_file
+
+    safe_name=$(basename "${laz_file%.laz}")
+    diagnostic_file="segments/${safe_name}.georeference-${stage}.json"
+    if singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        pdal info --metadata -p 0 "/data/$laz_file" > "$diagnostic_file"; then
+        georeference_log "$stage state for $laz_file saved to $diagnostic_file"
+        georeference_log "$stage first point for $laz_file: $(extract_first_point_dimension "$diagnostic_file" X),$(extract_first_point_dimension "$diagnostic_file" Y),$(extract_first_point_dimension "$diagnostic_file" Z)"
+    else
+        georeference_log "WARNING: unable to inspect $laz_file at $stage stage"
+    fi
 }
 
 translate_laz_to_original_coordinates() {
@@ -97,7 +137,11 @@ translate_laz_to_original_coordinates() {
     temporary_file="$directory/.${filename%.laz}.absolute.laz"
     matrix="1 0 0 $FIRST_POINT_X 0 1 0 $FIRST_POINT_Y 0 0 1 $FIRST_POINT_Z 0 0 0 1"
 
-    singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+    georeference_log "restoring $laz_file with matrix: $matrix"
+    georeference_log "writing common scale=($LAS_SCALE_X,$LAS_SCALE_Y,$LAS_SCALE_Z) offset=($LAS_OFFSET_X,$LAS_OFFSET_Y,$LAS_OFFSET_Z)"
+    log_laz_state "$laz_file" "before"
+
+    if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
         pdal translate "/data/$laz_file" "/data/$temporary_file" transformation \
         --filters.transformation.matrix="$matrix" \
         --writers.las.forward=header \
@@ -106,9 +150,17 @@ translate_laz_to_original_coordinates() {
         --writers.las.scale_z="$LAS_SCALE_Z" \
         --writers.las.offset_x="$LAS_OFFSET_X" \
         --writers.las.offset_y="$LAS_OFFSET_Y" \
-        --writers.las.offset_z="$LAS_OFFSET_Z" || return 1
+        --writers.las.offset_z="$LAS_OFFSET_Z"; then
+        georeference_log "ERROR: PDAL transform failed for $laz_file"
+        return 1
+    fi
 
-    mv "$temporary_file" "$laz_file"
+    if ! mv "$temporary_file" "$laz_file"; then
+        georeference_log "ERROR: unable to replace $laz_file with transformed output"
+        return 1
+    fi
+    log_laz_state "$laz_file" "after"
+    georeference_log "completed coordinate restoration for $laz_file"
 }
 
 create_tree_info_geojson() {

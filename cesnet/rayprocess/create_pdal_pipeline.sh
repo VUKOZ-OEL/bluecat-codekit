@@ -38,6 +38,7 @@ pipeline+=",{
       \"type\": \"writers.las\",
       \"dataformat_id\": 1,
       \"minor_version\": 2,
+      \"forward\": \"scale,offset\",
       \"filename\": \"$OUTPUT_FILE\"
     }
   ]

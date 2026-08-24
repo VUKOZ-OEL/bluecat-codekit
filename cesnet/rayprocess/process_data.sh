@@ -10,12 +10,17 @@ LEAVES_PLY="cloud_leaves.ply"
 FIRST_POINT_JSON="${SOURCE_DATA}.first.json"
 TREE_INFO_GEOJSON="${SOURCE_DATA}.treeInfo.geojson"
 
-source georeference_results.sh
+if ! source georeference_results.sh; then
+    echo "$(date) ERROR: failed to load georeference_results.sh" >> "$LOG_FILE"
+    return 1
+fi
+georeference_log "loaded georeference_results.sh"
 
 
 echo "$(date) pdal processing start" >> $LOG_FILE
 singularity exec -B $SCRATCHDIR/:/data ./pdal.img pdal pipeline /data/pdal_pipeline.json
 echo "$(date) pdal processing end" >> $LOG_FILE
+georeference_log "PDAL preprocessing completed; cloud.laz is the common coordinate and quantisation reference"
 
 # RayCloudTools shifts this exact cloud by its first point when
 # --remove_start_pos is used. Persist that translation for the results and
@@ -120,6 +125,7 @@ for segment_file in "$SEGMENT_DIR"/*.ply; do
     singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayrender "/data/$segment_relative" right ends
     singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayexport \
         "/data/$segment_relative" "/data/$segment_laz" "/data/$segment_traj"
+    georeference_log "rayexport completed for $segment_relative -> $segment_laz"
     translate_laz_to_original_coordinates "$segment_laz" || {
         echo "$(date) failed to restore coordinates in $segment_laz" >> "$LOG_FILE"
         return 1
