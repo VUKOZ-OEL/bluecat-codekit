@@ -120,14 +120,10 @@ for segment_file in "$SEGMENT_DIR"/*.ply; do
     segment_name=$(basename "$segment_file")
     segment_relative="segments/$segment_name"
     segment_laz="${segment_relative%.ply}.laz"
-    segment_traj="${segment_relative%.ply}.txt"
 
     singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayrender "/data/$segment_relative" right ends
-    singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img rayexport \
-        "/data/$segment_relative" "/data/$segment_laz" "/data/$segment_traj"
-    georeference_log "rayexport completed for $segment_relative -> $segment_laz"
-    translate_laz_to_original_coordinates "$segment_laz" || {
-        echo "$(date) failed to restore coordinates in $segment_laz" >> "$LOG_FILE"
+    export_ply_to_georeferenced_laz "$segment_relative" "$segment_laz" || {
+        echo "$(date) failed to export georeferenced $segment_laz" >> "$LOG_FILE"
         return 1
     }
     singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img raywrap "/data/$segment_relative" inwards 1.0

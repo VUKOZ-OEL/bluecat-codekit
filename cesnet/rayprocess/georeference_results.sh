@@ -108,59 +108,118 @@ save_las_scale_and_offset() {
     georeference_log "LAS quantisation: scale=($LAS_SCALE_X,$LAS_SCALE_Y,$LAS_SCALE_Z) offset=($LAS_OFFSET_X,$LAS_OFFSET_Y,$LAS_OFFSET_Z)"
 }
 
-log_laz_state() {
-    local laz_file="$1"
+log_cloud_state() {
+    local cloud_file="$1"
     local stage="$2"
     local safe_name
     local diagnostic_file
 
-    safe_name=$(basename "${laz_file%.laz}")
+    safe_name=$(basename "$cloud_file")
+    safe_name="${safe_name%.*}"
     diagnostic_file="segments/${safe_name}.georeference-${stage}.json"
     if singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal info --metadata -p 0 "/data/$laz_file" > "$diagnostic_file"; then
-        georeference_log "$stage state for $laz_file saved to $diagnostic_file"
-        georeference_log "$stage first point for $laz_file: $(extract_first_point_dimension "$diagnostic_file" X),$(extract_first_point_dimension "$diagnostic_file" Y),$(extract_first_point_dimension "$diagnostic_file" Z)"
+        pdal info --metadata -p 0 "/data/$cloud_file" > "$diagnostic_file"; then
+        georeference_log "$stage state for $cloud_file saved to $diagnostic_file"
+        georeference_log "$stage first point for $cloud_file: $(extract_first_point_dimension "$diagnostic_file" X),$(extract_first_point_dimension "$diagnostic_file" Y),$(extract_first_point_dimension "$diagnostic_file" Z)"
     else
-        georeference_log "WARNING: unable to inspect $laz_file at $stage stage"
+        georeference_log "WARNING: unable to inspect $cloud_file at $stage stage"
     fi
 }
 
-translate_laz_to_original_coordinates() {
-    local laz_file="$1"
-    local directory
-    local filename
-    local temporary_file
+validate_first_point_transform() {
+    local ply_file="$1"
+    local laz_file="$2"
+    local safe_name
+    local source_diagnostic
+    local output_diagnostic
+    local source_x source_y source_z
+    local output_x output_y output_z
+    local comparison
+
+    safe_name=$(basename "$ply_file")
+    safe_name="${safe_name%.*}"
+    source_diagnostic="segments/${safe_name}.georeference-source-ply.json"
+    output_diagnostic="segments/${safe_name}.georeference-output-laz.json"
+
+    source_x=$(extract_first_point_dimension "$source_diagnostic" X)
+    source_y=$(extract_first_point_dimension "$source_diagnostic" Y)
+    source_z=$(extract_first_point_dimension "$source_diagnostic" Z)
+    output_x=$(extract_first_point_dimension "$output_diagnostic" X)
+    output_y=$(extract_first_point_dimension "$output_diagnostic" Y)
+    output_z=$(extract_first_point_dimension "$output_diagnostic" Z)
+
+    if ! is_json_number "$source_x" || ! is_json_number "$source_y" || ! is_json_number "$source_z" || \
+       ! is_json_number "$output_x" || ! is_json_number "$output_y" || ! is_json_number "$output_z"; then
+        georeference_log "ERROR: unable to validate first point for $laz_file"
+        return 1
+    fi
+
+    if comparison=$(awk \
+        -v sx="$source_x" -v sy="$source_y" -v sz="$source_z" \
+        -v ox="$output_x" -v oy="$output_y" -v oz="$output_z" \
+        -v tx="$FIRST_POINT_X" -v ty="$FIRST_POINT_Y" -v tz="$FIRST_POINT_Z" \
+        -v scale_x="$LAS_SCALE_X" -v scale_y="$LAS_SCALE_Y" -v scale_z="$LAS_SCALE_Z" '
+        function abs(value) { return value < 0 ? -value : value }
+        BEGIN {
+            expected_x = sx + tx
+            expected_y = sy + ty
+            expected_z = sz + tz
+            dx = abs(ox - expected_x)
+            dy = abs(oy - expected_y)
+            dz = abs(oz - expected_z)
+            printf "expected=(%.15g,%.15g,%.15g) actual=(%.15g,%.15g,%.15g) abs_delta=(%.15g,%.15g,%.15g)", \
+                expected_x, expected_y, expected_z, ox, oy, oz, dx, dy, dz
+            tolerance_x = abs(scale_x) * 0.500001 + 1e-12
+            tolerance_y = abs(scale_y) * 0.500001 + 1e-12
+            tolerance_z = abs(scale_z) * 0.500001 + 1e-12
+            exit(dx <= tolerance_x && dy <= tolerance_y && dz <= tolerance_z ? 0 : 1)
+        }
+    '); then
+        georeference_log "first-point validation PASSED for $laz_file: $comparison"
+    else
+        georeference_log "ERROR: first-point validation FAILED for $laz_file: $comparison"
+        return 1
+    fi
+}
+
+export_ply_to_georeferenced_laz() {
+    local ply_file="$1"
+    local laz_file="$2"
     local matrix
 
-    directory=$(dirname "$laz_file")
-    filename=$(basename "$laz_file")
-    temporary_file="$directory/.${filename%.laz}.absolute.laz"
     matrix="1 0 0 $FIRST_POINT_X 0 1 0 $FIRST_POINT_Y 0 0 1 $FIRST_POINT_Z 0 0 0 1"
 
-    georeference_log "restoring $laz_file with matrix: $matrix"
+    # Do not create an intermediate LAZ with rayexport. RayCloudTools writes
+    # that file with a one-metre LAS scale and irreversibly removes decimals.
+    # PDAL must read the original PLY coordinates and translate them before the
+    # first LAS integer quantisation takes place.
+    georeference_log "exporting $ply_file directly to $laz_file; rayexport LAZ bypassed to preserve PLY decimals"
+    georeference_log "applying matrix: $matrix"
     georeference_log "writing common scale=($LAS_SCALE_X,$LAS_SCALE_Y,$LAS_SCALE_Z) offset=($LAS_OFFSET_X,$LAS_OFFSET_Y,$LAS_OFFSET_Z)"
-    log_laz_state "$laz_file" "before"
+    log_cloud_state "$ply_file" "source-ply"
 
     if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal translate "/data/$laz_file" "/data/$temporary_file" transformation \
+        pdal translate "/data/$ply_file" "/data/$laz_file" transformation \
         --filters.transformation.matrix="$matrix" \
-        --writers.las.forward=header \
+        --writers.las.compression=true \
+        --writers.las.minor_version=2 \
+        --writers.las.dataformat_id=3 \
+        --writers.las.extra_dims=all \
         --writers.las.scale_x="$LAS_SCALE_X" \
         --writers.las.scale_y="$LAS_SCALE_Y" \
         --writers.las.scale_z="$LAS_SCALE_Z" \
         --writers.las.offset_x="$LAS_OFFSET_X" \
         --writers.las.offset_y="$LAS_OFFSET_Y" \
         --writers.las.offset_z="$LAS_OFFSET_Z"; then
-        georeference_log "ERROR: PDAL transform failed for $laz_file"
+        georeference_log "ERROR: direct PDAL PLY-to-LAZ export failed for $ply_file"
         return 1
     fi
 
-    if ! mv "$temporary_file" "$laz_file"; then
-        georeference_log "ERROR: unable to replace $laz_file with transformed output"
+    log_cloud_state "$laz_file" "output-laz"
+    if ! validate_first_point_transform "$ply_file" "$laz_file"; then
         return 1
     fi
-    log_laz_state "$laz_file" "after"
-    georeference_log "completed coordinate restoration for $laz_file"
+    georeference_log "completed direct georeferenced export for $laz_file"
 }
 
 create_tree_info_geojson() {
