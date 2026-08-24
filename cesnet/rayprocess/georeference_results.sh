@@ -48,7 +48,7 @@ save_first_point_coordinates() {
 
     georeference_log "reading first point from $cloud_file"
     if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal info -p 0 "/data/$cloud_file" > "$raw_info"; then
+        pdal info -p 0 "/data/$cloud_file" > "$raw_info" 2>> "$LOG_FILE"; then
         georeference_log "ERROR: pdal info -p 0 failed for $cloud_file"
         return 1
     fi
@@ -79,7 +79,7 @@ save_las_scale_and_offset() {
 
     georeference_log "reading LAS scale and offset from $cloud_file"
     if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal info --metadata "/data/$cloud_file" > "$raw_metadata"; then
+        pdal info --metadata "/data/$cloud_file" > "$raw_metadata" 2>> "$LOG_FILE"; then
         georeference_log "ERROR: pdal info --metadata failed for $cloud_file"
         return 1
     fi
@@ -118,7 +118,7 @@ log_cloud_state() {
     safe_name="${safe_name%.*}"
     diagnostic_file="segments/${safe_name}.georeference-${stage}.json"
     if singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal info --metadata -p 0 "/data/$cloud_file" > "$diagnostic_file"; then
+        pdal info --metadata -p 0 "/data/$cloud_file" > "$diagnostic_file" 2>> "$LOG_FILE"; then
         georeference_log "$stage state for $cloud_file saved to $diagnostic_file"
         georeference_log "$stage first point for $cloud_file: $(extract_first_point_dimension "$diagnostic_file" X),$(extract_first_point_dimension "$diagnostic_file" Y),$(extract_first_point_dimension "$diagnostic_file" Z)"
     else
@@ -267,7 +267,7 @@ georeference_rayexport_laz() {
         --writers.las.scale_z="$LAS_SCALE_Z" \
         --writers.las.offset_x="$output_offset_x" \
         --writers.las.offset_y="$output_offset_y" \
-        --writers.las.offset_z="$output_offset_z"; then
+        --writers.las.offset_z="$output_offset_z" >> "$LOG_FILE" 2>&1; then
         georeference_log "ERROR: PDAL georeference failed for rayexport result $laz_file"
         return 1
     fi
