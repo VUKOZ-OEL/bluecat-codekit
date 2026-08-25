@@ -139,6 +139,7 @@ validate_first_point_transform() {
     local output_scale_x output_scale_y output_scale_z
     local output_offset_x output_offset_y output_offset_z
     local comparison header_comparison
+    local max_scale_steps="${GEOREFERENCE_MAX_SCALE_STEPS:-5}"
 
     safe_name=$(basename "$source_laz")
     safe_name="${safe_name%.*}"
@@ -176,6 +177,11 @@ validate_first_point_transform() {
         georeference_log "ERROR: unable to validate LAS scale/offset for $laz_file"
         return 1
     fi
+    if ! is_json_number "$max_scale_steps" || \
+       ! awk -v steps="$max_scale_steps" 'BEGIN { exit(steps > 0 ? 0 : 1) }'; then
+        georeference_log "ERROR: GEOREFERENCE_MAX_SCALE_STEPS must be a positive number; got '$max_scale_steps'"
+        return 1
+    fi
 
     if header_comparison=$(awk \
         -v ssx="$source_scale_x" -v ssy="$source_scale_y" -v ssz="$source_scale_z" \
@@ -201,11 +207,17 @@ validate_first_point_transform() {
         return 1
     fi
 
+    # `pdal info` prints large coordinates with limited decimal precision.  A
+    # correctly encoded point can therefore appear a few LAS scale steps away
+    # from the value calculated from the more precise local coordinate.  Keep
+    # this check tight enough to catch centimetre/metre quantisation, while
+    # accepting that diagnostic-output rounding.
     if comparison=$(awk \
         -v sx="$source_x" -v sy="$source_y" -v sz="$source_z" \
         -v ox="$output_x" -v oy="$output_y" -v oz="$output_z" \
         -v tx="$FIRST_POINT_X" -v ty="$FIRST_POINT_Y" -v tz="$FIRST_POINT_Z" \
-        -v scale_x="$LAS_SCALE_X" -v scale_y="$LAS_SCALE_Y" -v scale_z="$LAS_SCALE_Z" '
+        -v scale_x="$source_scale_x" -v scale_y="$source_scale_y" -v scale_z="$source_scale_z" \
+        -v max_scale_steps="$max_scale_steps" '
         function abs(value) { return value < 0 ? -value : value }
         BEGIN {
             expected_x = sx + tx
@@ -214,11 +226,15 @@ validate_first_point_transform() {
             dx = abs(ox - expected_x)
             dy = abs(oy - expected_y)
             dz = abs(oz - expected_z)
-            printf "expected=(%.15g,%.15g,%.15g) actual=(%.15g,%.15g,%.15g) abs_delta=(%.15g,%.15g,%.15g)", \
-                expected_x, expected_y, expected_z, ox, oy, oz, dx, dy, dz
-            tolerance_x = abs(scale_x) * 0.500001 + 1e-12
-            tolerance_y = abs(scale_y) * 0.500001 + 1e-12
-            tolerance_z = abs(scale_z) * 0.500001 + 1e-12
+            scale_steps_x = dx / abs(scale_x)
+            scale_steps_y = dy / abs(scale_y)
+            scale_steps_z = dz / abs(scale_z)
+            tolerance_x = abs(scale_x) * max_scale_steps + 1e-12
+            tolerance_y = abs(scale_y) * max_scale_steps + 1e-12
+            tolerance_z = abs(scale_z) * max_scale_steps + 1e-12
+            printf "expected=(%.15g,%.15g,%.15g) actual=(%.15g,%.15g,%.15g) abs_delta=(%.15g,%.15g,%.15g) delta_in_scale_steps=(%.6g,%.6g,%.6g) allowed_scale_steps=%.6g", \
+                expected_x, expected_y, expected_z, ox, oy, oz, dx, dy, dz, \
+                scale_steps_x, scale_steps_y, scale_steps_z, max_scale_steps
             exit(dx <= tolerance_x && dy <= tolerance_y && dz <= tolerance_z ? 0 : 1)
         }
     '); then
