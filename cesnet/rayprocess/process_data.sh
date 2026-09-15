@@ -78,9 +78,17 @@ echo "$(date) terrain extracted" >> $LOG_FILE
 run_logged "rayextract trunks" singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img \
     rayextract trunks "$DATA_PLY" || return 1
 echo "$(date) trunks extracted" >> $LOG_FILE
-run_logged "rayextract forest" singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img \
-    rayextract forest "$DATA_PLY" || return 1
-echo "$(date) forest extracted" >> $LOG_FILE
+
+# rayextract forest is memory-hungry and its output (cloud_forest.txt) is not
+# consumed by any downstream step. Skip it by default; set SKIP_FOREST=false
+# if a future workflow actually needs the forest summary.
+if [ "${SKIP_FOREST:-true}" != "true" ]; then
+    run_logged "rayextract forest" singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img \
+        rayextract forest "$DATA_PLY" || return 1
+    echo "$(date) forest extracted" >> $LOG_FILE
+else
+    echo "$(date) forest extraction skipped (SKIP_FOREST=true)" >> $LOG_FILE
+fi
 
 #singularity exec -B $SCRATCHDIR/:/data ./raycloudtools.img rayextract trees $DATA_PLY $TERRAIN_PLY
 
