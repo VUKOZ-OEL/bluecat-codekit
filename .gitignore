@@ -28,3 +28,7 @@ out/
 # Other
 .DS_Store
 desktop.ini
+
+# Local test run outputs (never commit)
+test_runs_output/
+test_runs_outputs/

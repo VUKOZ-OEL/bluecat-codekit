@@ -75,7 +75,7 @@ save_first_point_coordinates() {
 
 save_las_scale_and_offset() {
     local cloud_file="$1"
-    local raw_metadata="segments/rayexport.las-metadata.pdal.json"
+    local raw_metadata="las-metadata.$(basename "$cloud_file").pdal.json"
 
     georeference_log "reading LAS scale and offset from $cloud_file"
     if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
