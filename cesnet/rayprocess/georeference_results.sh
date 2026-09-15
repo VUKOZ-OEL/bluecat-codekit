@@ -289,6 +289,139 @@ georeference_tree_segment() {
     georeference_log "completed georeferenced export for $laz_file"
 }
 
+create_dtm_geotiff() {
+    local terrain_ply="$1"
+    local output_tif="$2"
+    local resolution="${3:-0.1}"
+
+    georeference_log "creating DTM GeoTIFF from $terrain_ply at ${resolution} m resolution"
+
+    # cloud_mesh.ply lives in RayCloudTools' local frame (shifted by
+    # --remove_start_pos). GeoJSON trees and the final LAZ exports are in the
+    # original georeferenced frame. Transform the mesh by the same first-point
+    # translation, then rasterise it — so the DMT lines up with the rest.
+    local matrix="1 0 0 $FIRST_POINT_X 0 1 0 $FIRST_POINT_Y 0 0 1 $FIRST_POINT_Z 0 0 0 1"
+
+    local pipeline_file="dtm_pipeline.json"
+    cat > "$pipeline_file" <<EOF
+{
+  "pipeline": [
+    "/data/$terrain_ply",
+    {
+      "type": "filters.transformation",
+      "matrix": "$matrix"
+    },
+    {
+      "type": "writers.gdal",
+      "filename": "/data/$output_tif",
+      "resolution": $resolution,
+      "output_type": "mean",
+      "data_type": "float32",
+      "gdaldriver": "GTiff",
+      "window_size": 3
+    }
+  ]
+}
+EOF
+
+    if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        pdal pipeline "/data/$pipeline_file" >> "$LOG_FILE" 2>&1; then
+        georeference_log "ERROR: PDAL DTM rasterisation failed for $terrain_ply"
+        rm -f "$pipeline_file"
+        return 1
+    fi
+    rm -f "$pipeline_file"
+
+    if [ ! -s "$output_tif" ]; then
+        georeference_log "ERROR: DTM $output_tif was not created or is empty"
+        return 1
+    fi
+    georeference_log "wrote DTM $output_tif"
+}
+
+
+sample_dtm_at_point() {
+    local dtm_tif="$1"
+    local x="$2"
+    local y="$3"
+
+    # gdallocationinfo outputs the raster value on the last line.  Use
+    # bilinear interpolation for sub-pixel accuracy at 10 cm resolution.
+    singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        gdallocationinfo -valonly -b 1 -interp bilinear "/data/$dtm_tif" "$x" "$y" 2>/dev/null | tail -n 1
+}
+
+
+add_dist2dmt_to_treeinfo() {
+    local tree_info_geojson="$1"
+    local dtm_tif="$2"
+    local dtm_resolution="${3:-0.1}"
+
+    georeference_log "adding dist2dmt from $dtm_tif to $tree_info_geojson"
+
+    local tmp="${tree_info_geojson}.tmp"
+    local tree_x tree_y tree_z dtm_z dist updated
+
+    cp "$tree_info_geojson" "$tmp" || return 1
+
+    # Patch the GeoJSON in-place: read every "Point" feature, sample the DTM,
+    # and inject "dist2dmt" into its properties. Single Python pass is much
+    # safer than sed/awk for nested JSON.
+    singularity exec -B "$SCRATCHDIR":/data ./pdal.img python3 - "$tmp" "$dtm_tif" "$SCRATCHDIR" <<'PYEOF'
+import json, subprocess, sys
+from pathlib import Path
+
+geojson_path = Path(sys.argv[1])
+dtm_tif = sys.argv[2]   # path inside container (/data/...)
+scratch = sys.argv[3]
+
+with geojson_path.open() as fh:
+    data = json.load(fh)
+
+updated = 0
+skipped = 0
+for feat in data.get("features", []):
+    geom = feat.get("geometry", {})
+    if geom.get("type") != "Point":
+        continue
+    coords = geom.get("coordinates") or []
+    if len(coords) < 3:
+        continue
+    x, y, tree_z = coords[0], coords[1], coords[2]
+
+    # Call gdallocationinfo inside the same container (paths already container-side)
+    out = subprocess.run(
+        ["gdallocationinfo", "-valonly", "-b", "1", "-interp", "bilinear", dtm_tif, str(x), str(y)],
+        capture_output=True, text=True, check=False,
+    )
+    val = (out.stdout or "").strip().split()[-1] if out.stdout else ""
+    try:
+        dtm_z = float(val)
+    except (ValueError, IndexError):
+        skipped += 1
+        continue
+
+    dist = tree_z - dtm_z
+    feat.setdefault("properties", {})["dist2dmt"] = round(dist, 3)
+    updated += 1
+
+with geojson_path.open("w") as fh:
+    json.dump(data, fh, ensure_ascii=False)
+
+print(f"updated={updated} skipped={skipped}")
+sys.exit(0 if updated > 0 else 2)
+PYEOF
+
+    if [ $? -ne 0 ]; then
+        georeference_log "ERROR: dist2dmt enrichment failed"
+        rm -f "$tmp"
+        return 1
+    fi
+
+    mv "$tmp" "$tree_info_geojson"
+    georeference_log "dist2dmt added for $(grep -o '\"dist2dmt\"' "$tree_info_geojson" | wc -l) trees"
+}
+
 create_tree_info_geojson() {
     local tree_info_file="$1"
     local output_file="$2"

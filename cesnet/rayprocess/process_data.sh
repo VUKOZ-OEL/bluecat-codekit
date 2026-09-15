@@ -170,6 +170,20 @@ create_tree_info_geojson "cloud_trees_info.txt" "$TREE_INFO_GEOJSON" || {
 }
 echo "$(date) georeferenced tree info saved to $TREE_INFO_GEOJSON" >> "$LOG_FILE"
 
+# --- DTM + per-tree height above ground ------------------------------------
+DTM_TIF="${SOURCE_DATA}.dmt.tif"
+create_dtm_geotiff "$TERRAIN_PLY" "$DTM_TIF" "0.1" || {
+    log_message "ERROR: failed to create DTM from $TERRAIN_PLY"
+    return 1
+}
+echo "$(date) DTM saved to $DTM_TIF" >> "$LOG_FILE"
+
+add_dist2dmt_to_treeinfo "$TREE_INFO_GEOJSON" "$DTM_TIF" "0.1" || {
+    log_message "ERROR: failed to enrich $TREE_INFO_GEOJSON with dist2dmt"
+    return 1
+}
+echo "$(date) dist2dmt column added to $TREE_INFO_GEOJSON" >> "$LOG_FILE"
+
 echo "lof in SCRATCHDIR:" >> $LOG_FILE
 echo "$(ls -lh)" >> $LOG_FILE
 echo "" >> $LOG_FILE

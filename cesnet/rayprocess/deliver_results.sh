@@ -6,6 +6,9 @@ log_message "deliver results start"
 cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt" &>> >(log_message)
 cp "$SOURCE_DATA.treeInfo.geojson" "$DATADIR/$SOURCE_DATA.treeInfo.geojson" &>> >(log_message)
 cp "$SOURCE_DATA.first.json" "$DATADIR/$SOURCE_DATA.first.json" &>> >(log_message)
+if [ -s "$SOURCE_DATA.dmt.tif" ]; then
+    cp "$SOURCE_DATA.dmt.tif" "$DATADIR/$SOURCE_DATA.dmt.tif" &>> >(log_message)
+fi
 
 cp $LOG_FILE log
 
