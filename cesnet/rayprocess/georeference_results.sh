@@ -355,31 +355,34 @@ sample_dtm_at_point() {
 add_dist2dmt_to_treeinfo() {
     local tree_info_geojson="$1"
     local dtm_tif="$2"
-    local dtm_resolution="${3:-0.1}"
+    local tmp_geojson="${tree_info_geojson}.tmp"
 
     georeference_log "adding dist2dmt from $dtm_tif to $tree_info_geojson"
 
-    local tmp="${tree_info_geojson}.tmp"
-    local tree_x tree_y tree_z dtm_z dist updated
+    cp "$tree_info_geojson" "$tmp_geojson" || return 1
 
-    cp "$tree_info_geojson" "$tmp" || return 1
-
-    # Patch the GeoJSON in-place: read every "Point" feature, sample the DTM,
-    # and inject "dist2dmt" into its properties. Single Python pass is much
-    # safer than sed/awk for nested JSON.
-    singularity exec -B "$SCRATCHDIR":/data ./pdal.img python3 - "$tmp" "$dtm_tif" "$SCRATCHDIR" <<'PYEOF'
-import json, subprocess, sys
+    # Patch GeoJSON in-place inside the pdal container.  IMPORTANT: every path
+    # that Python sees must be the CONTAINER-side path (/data/...), not the
+    # host path -- otherwise subprocesses like gdallocationinfo cannot find
+    # the file.  gdallocationinfo needs -geoloc to interpret the input XY as
+    # projected (georeferenced) coordinates; without it, XY would be treated
+    # as pixel/line indices and return empty everywhere.
+    singularity exec -B "$SCRATCHDIR":/data \
+        --env GEOJSON_IN="/data/$tmp_geojson" \
+        --env DTM_TIF="/data/$dtm_tif" \
+        ./pdal.img python3 - <<'PYEOF'
+import json, os, subprocess, sys
 from pathlib import Path
 
-geojson_path = Path(sys.argv[1])
-dtm_tif = sys.argv[2]   # path inside container (/data/...)
-scratch = sys.argv[3]
+geojson_path = Path(os.environ["GEOJSON_IN"])
+dtm_tif = os.environ["DTM_TIF"]
 
 with geojson_path.open() as fh:
     data = json.load(fh)
 
 updated = 0
 skipped = 0
+sample_count = 0
 for feat in data.get("features", []):
     geom = feat.get("geometry", {})
     if geom.get("type") != "Point":
@@ -389,15 +392,24 @@ for feat in data.get("features", []):
         continue
     x, y, tree_z = coords[0], coords[1], coords[2]
 
-    # Call gdallocationinfo inside the same container (paths already container-side)
+    # -geoloc: X and Y are georeferenced (projected) coordinates, not pixels.
     out = subprocess.run(
-        ["gdallocationinfo", "-valonly", "-b", "1", "-interp", "bilinear", dtm_tif, str(x), str(y)],
+        ["gdallocationinfo", "-geoloc", "-valonly", "-b", "1", "-interp", "bilinear", dtm_tif, str(x), str(y)],
         capture_output=True, text=True, check=False,
     )
-    val = (out.stdout or "").strip().split()[-1] if out.stdout else ""
+    val = (out.stdout or "").strip()
+    if out.returncode != 0:
+        if sample_count < 3:
+            print(f"sample fail rc={out.returncode} stdout={out.stdout!r} stderr={out.stderr!r}", file=sys.stderr)
+            sample_count += 1
+        skipped += 1
+        continue
     try:
         dtm_z = float(val)
-    except (ValueError, IndexError):
+    except ValueError:
+        if sample_count < 3:
+            print(f"sample parse fail val={val!r} (x={x}, y={y})", file=sys.stderr)
+            sample_count += 1
         skipped += 1
         continue
 
@@ -414,12 +426,12 @@ PYEOF
 
     if [ $? -ne 0 ]; then
         georeference_log "ERROR: dist2dmt enrichment failed"
-        rm -f "$tmp"
+        rm -f "$tmp_geojson"
         return 1
     fi
 
-    mv "$tmp" "$tree_info_geojson"
-    georeference_log "dist2dmt added for $(grep -o '\"dist2dmt\"' "$tree_info_geojson" | wc -l) trees"
+    mv "$tmp_geojson" "$tree_info_geojson"
+    georeference_log "dist2dmt added to $(grep -c '"dist2dmt"' "$tree_info_geojson") tree features"
 }
 
 create_tree_info_geojson() {

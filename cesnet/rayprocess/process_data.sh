@@ -178,7 +178,7 @@ create_dtm_geotiff "$TERRAIN_PLY" "$DTM_TIF" "0.1" || {
 }
 echo "$(date) DTM saved to $DTM_TIF" >> "$LOG_FILE"
 
-add_dist2dmt_to_treeinfo "$TREE_INFO_GEOJSON" "$DTM_TIF" "0.1" || {
+add_dist2dmt_to_treeinfo "$TREE_INFO_GEOJSON" "$DTM_TIF" || {
     log_message "ERROR: failed to enrich $TREE_INFO_GEOJSON with dist2dmt"
     return 1
 }
