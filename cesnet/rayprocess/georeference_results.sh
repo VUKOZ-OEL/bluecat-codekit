@@ -361,28 +361,40 @@ add_dist2dmt_to_treeinfo() {
 
     cp "$tree_info_geojson" "$tmp_geojson" || return 1
 
-    # Patch GeoJSON in-place inside the pdal container.  IMPORTANT: every path
-    # that Python sees must be the CONTAINER-side path (/data/...), not the
-    # host path -- otherwise subprocesses like gdallocationinfo cannot find
-    # the file.  gdallocationinfo needs -geoloc to interpret the input XY as
-    # projected (georeferenced) coordinates; without it, XY would be treated
-    # as pixel/line indices and return empty everywhere.
+    # Use Python GDAL bindings (present in pdal.img) instead of the
+    # gdallocationinfo subprocess, which on the pdal.img GDAL version fails
+    # with just a usage message on every -geoloc sample. Reading via
+    # GetGeoTransform + ReadAsArray is stable across GDAL versions.
     singularity exec -B "$SCRATCHDIR":/data \
         --env GEOJSON_IN="/data/$tmp_geojson" \
         --env DTM_TIF="/data/$dtm_tif" \
         ./pdal.img python3 - <<'PYEOF'
-import json, os, subprocess, sys
+import json, os, sys
 from pathlib import Path
 
+try:
+    from osgeo import gdal
+except ImportError:
+    print("osgeo.gdal not available; falling back to gdallocationinfo"
+          " is not supported here", file=sys.stderr)
+    sys.exit(3)
+
+gdal.UseExceptions()
 geojson_path = Path(os.environ["GEOJSON_IN"])
 dtm_tif = os.environ["DTM_TIF"]
+
+ds = gdal.Open(dtm_tif, gdal.GA_ReadOnly)
+band = ds.GetRasterBand(1)
+gt = ds.GetGeoTransform()   # (origin_x, px_w, rot1, origin_y, rot2, px_h)
+inv_gt = gdal.InvGeoTransform(gt)
+nodata = band.GetNoDataValue()
+band_arr = band.ReadAsArray()  # small: 25x25 m at 10 cm -> ~250x250 px
+ysize, xsize = band_arr.shape
 
 with geojson_path.open() as fh:
     data = json.load(fh)
 
-updated = 0
-skipped = 0
-sample_count = 0
+updated = skipped = 0
 for feat in data.get("features", []):
     geom = feat.get("geometry", {})
     if geom.get("type") != "Point":
@@ -392,45 +404,26 @@ for feat in data.get("features", []):
         continue
     x, y, tree_z = coords[0], coords[1], coords[2]
 
-    # -geoloc: X and Y are georeferenced (projected) coordinates, not pixels.
-    # Older GDAL in pdal.img does not have -interp; default is nearest which
-    # at 10 cm res is fine for a check. Read full output and lift the LAST
-    # numeric line (that is the band value).
-    out = subprocess.run(
-        ["gdallocationinfo", "-geoloc", "-b", "1", dtm_tif, str(x), str(y)],
-        capture_output=True, text=True, check=False,
-    )
-    if out.returncode != 0:
-        if sample_count < 3:
-            print(f"sample fail rc={out.returncode} stdout={out.stdout!r} stderr={out.stderr!r}", file=sys.stderr)
-            sample_count += 1
+    px, py = gdal.ApplyGeoTransform(inv_gt, x, y)
+    col, row = int(px), int(py)
+    if 0 <= col < xsize and 0 <= row < ysize:
+        z_val = float(band_arr[row, col])
+        if nodata is not None and z_val == nodata:
+            skipped += 1
+            continue
+        feat.setdefault("properties", {})["dist2dmt"] = round(tree_z - z_val, 3)
+        updated += 1
+    else:
         skipped += 1
-        continue
-    val_lines = (out.stdout or "").strip().splitlines()
-    if sample_count < 1:
-        print(f"sample raw out for ({x},{y}): {val_lines!r}", file=sys.stderr)
-        sample_count += 1
-    val = val_lines[-1].strip() if val_lines else ""
-    try:
-        dtm_z = float(val)
-    except ValueError:
-        skipped += 1
-        continue
-
-    dist = tree_z - dtm_z
-    feat.setdefault("properties", {})["dist2dmt"] = round(dist, 3)
-    updated += 1
 
 with geojson_path.open("w") as fh:
     json.dump(data, fh, ensure_ascii=False)
 
-print(f"updated={updated} skipped={skipped}")
-sys.exit(0 if updated > 0 else 2)
+print(f"updated={updated} skipped={skipped} raster={xsize}x{ysize}")
 PYEOF
 
-    # Non-fatal: keep the pipeline running even if enrichment fails
     if [ $? -ne 0 ]; then
-        georeference_log "WARNING: dist2dmt enrichment returned non-zero; continuing without it"
+        georeference_log "WARNING: dist2dmt enrichment failed; continuing without it"
         rm -f "$tmp_geojson"
         return 0
     fi
@@ -453,9 +446,12 @@ create_tree_info_sqlite() {
         --env SQLITE_OUT="/data/$out_sqlite" \
         --env DTM_TIF="/data/$dtm_tif" \
         ./pdal.img python3 - <<'PYEOF' 2>>"$LOG_FILE"
-import json, os, sqlite3, subprocess, sys
+import json, os, sqlite3, sys
 from pathlib import Path
 
+from osgeo import gdal
+
+gdal.UseExceptions()
 geojson_path = Path(os.environ["GEOJSON_IN"])
 sqlite_path = Path(os.environ["SQLITE_OUT"])
 dtm_tif = os.environ["DTM_TIF"]
@@ -463,35 +459,55 @@ dtm_tif = os.environ["DTM_TIF"]
 with geojson_path.open() as fh:
     data = json.load(fh)
 
-# Drop any existing table and rebuild (idempotent).
+# Open DTM and pre-compute inverse geotransform so tree XY -> pixel is cheap
+ds = gdal.Open(dtm_tif, gdal.GA_ReadOnly)
+band = ds.GetRasterBand(1)
+gt = ds.GetGeoTransform()
+inv_gt = gdal.InvGeoTransform(gt)
+nodata = band.GetNoDataValue()
+band_arr = band.ReadAsArray()
+ysize, xsize = band_arr.shape
+
+def read_dtm(px, py):
+    col, row = int(px), int(py)
+    if 0 <= col < xsize and 0 <= row < ysize:
+        v = float(band_arr[row, col])
+        if nodata is not None and v == nodata:
+            return None
+        return v
+    return None
+
+# Build schema dynamically from the union of all property keys, so every
+# GeoJSON property becomes a real SQLite column (not a JSON-overflow blob).
+prop_keys = []
+seen = set()
+for feat in data.get("features", []):
+    for k in (feat.get("properties") or {}).keys():
+        if k not in seen:
+            seen.add(k)
+            prop_keys.append(k)
+
+# dist2dmt is always present, computed from the DTM even if GeoJSON lacks it
+if "dist2dmt" not in seen:
+    prop_keys.append("dist2dmt")
+
+col_defs = ", ".join('"%s" REAL' % k.replace('"', '""') for k in prop_keys)
+
 if sqlite_path.exists():
     sqlite_path.unlink()
 conn = sqlite3.connect(sqlite_path)
 cur = conn.cursor()
-cur.execute("""
-CREATE TABLE trees (
-    fid INTEGER PRIMARY KEY,
-    x REAL, y REAL, z REAL,
-    dist2dmt REAL,
-    props TEXT
+cur.execute(
+    'CREATE TABLE trees (fid INTEGER PRIMARY KEY, x REAL, y REAL, z REAL, %s)' % col_defs
 )
-""")
 
-def read_dtm(px, py):
-    try:
-        out = subprocess.run(
-            ["gdallocationinfo", "-geoloc", "-b", "1", dtm_tif, str(px), str(py)],
-            capture_output=True, text=True, check=False, timeout=30,
-        )
-        if out.returncode != 0:
-            return None
-        lines = (out.stdout or "").strip().splitlines()
-        return float(lines[-1].strip()) if lines else None
-    except (ValueError, subprocess.TimeoutExpired):
-        return None
+placeholders = ",".join("?" for _ in prop_keys)
+insert_sql = (
+    'INSERT INTO trees (fid, x, y, z, %s) VALUES (?,?,?,?,%s)'
+    % (", ".join('"%s"' % k.replace('"', '""') for k in prop_keys), placeholders)
+)
 
-n_inserted = 0
-n_dtm_ok = 0
+n_inserted = n_dtm_ok = 0
 for feat in data.get("features", []):
     geom = feat.get("geometry", {})
     if geom.get("type") != "Point":
@@ -501,20 +517,23 @@ for feat in data.get("features", []):
         continue
     x, y, z = coords[0], coords[1], coords[2]
     fid = feat.get("id")
-    props = feat.get("properties", {}) or {}
-    dtm_z = read_dtm(x, y)
-    dist = round(z - dtm_z, 3) if dtm_z is not None else None
-    if dtm_z is not None:
-        n_dtm_ok += 1
-    cur.execute(
-        "INSERT INTO trees (fid, x, y, z, dist2dmt, props) VALUES (?,?,?,?,?,?)",
-        (fid, x, y, z, dist, json.dumps(props, ensure_ascii=False)),
-    )
+    props = dict(feat.get("properties") or {})
+
+    # Ensure dist2dmt is computed even when the geojson enrichment was skipped
+    if "dist2dmt" not in props:
+        px, py = gdal.ApplyGeoTransform(inv_gt, x, y)
+        dtm_z = read_dtm(px, py)
+        if dtm_z is not None:
+            props["dist2dmt"] = round(z - dtm_z, 3)
+            n_dtm_ok += 1
+
+    row_vals = [props.get(k) for k in prop_keys]
+    cur.execute(insert_sql, [fid, x, y, z] + row_vals)
     n_inserted += 1
 
 conn.commit()
 conn.close()
-print(f"sqlite rows inserted={n_inserted} dtm_sampled={n_dtm_ok}")
+print(f"sqlite rows inserted={n_inserted} dtm_sampled={n_dtm_ok} columns={len(prop_keys)}")
 PYEOF
 
     RC=$?

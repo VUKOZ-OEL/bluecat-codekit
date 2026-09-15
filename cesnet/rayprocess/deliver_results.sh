@@ -1,31 +1,27 @@
-
 log_message "deliver results start"
 
+# Everything produced by the pipeline lives directly in $SCRATCHDIR now, so
+# zip the whole directory and ship that one archive to $DATADIR.
+#
+# Explicitly included:
+#   - tree LAZ files in segments/
+#   - georeferenced tree info geojson + sqlite + DTM raster
+#   - per-segment diagnostic JSONs under segments/
+#   - pipeline log files
+# and all other intermediate artifacts produced by raycloudtools + PDAL.
 
+echo "lof in SCRATCHDIR:" >> $LOG_FILE
+echo "$(ls -lh)" >> $LOG_FILE
 
-cp cloud_trees_info.txt "$DATADIR/$SOURCE_DATA.treeInfo.txt" &>> >(log_message)
-cp "$SOURCE_DATA.treeInfo.geojson" "$DATADIR/$SOURCE_DATA.treeInfo.geojson" &>> >(log_message)
-cp "$SOURCE_DATA.first.json" "$DATADIR/$SOURCE_DATA.first.json" &>> >(log_message)
-if [ -s "$SOURCE_DATA.dmt.tif" ]; then
-    cp "$SOURCE_DATA.dmt.tif" "$DATADIR/$SOURCE_DATA.dmt.tif" &>> >(log_message)
-fi
-if [ -s "$SOURCE_DATA.sqlite" ]; then
-    cp "$SOURCE_DATA.sqlite" "$DATADIR/$SOURCE_DATA.sqlite" &>> >(log_message)
-fi
-
-cp $LOG_FILE log
-
-cp $LOG_FILE log
-
-# Create a ZIP file containing all results
-ZIP_NAME="${SOURCE_DATA}_results.zip"
+# Create a ZIP file containing everything in the working directory
+ZIP_NAME="${SOURCE_DATA%.laz}_results.zip"
 
 log_message "zip file name: $ZIP_NAME"
 
-zip -r "$ZIP_NAME" . 
+zip -r "$ZIP_NAME" . >> "$LOG_FILE" 2>&1
 
 echo "$(date) compressed" >> $LOG_FILE
 
-# Copy the ZIP file to $DATADIR
-cp "$ZIP_NAME" $DATADIR
+# Copy the single ZIP to $DATADIR
+cp "$ZIP_NAME" "$DATADIR"
 echo "$(date) Copied $ZIP_NAME to $DATADIR" >> $LOG_FILE
