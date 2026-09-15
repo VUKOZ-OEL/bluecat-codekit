@@ -393,23 +393,27 @@ for feat in data.get("features", []):
     x, y, tree_z = coords[0], coords[1], coords[2]
 
     # -geoloc: X and Y are georeferenced (projected) coordinates, not pixels.
+    # Older GDAL in pdal.img does not have -interp; default is nearest which
+    # at 10 cm res is fine for a check. Read full output and lift the LAST
+    # numeric line (that is the band value).
     out = subprocess.run(
-        ["gdallocationinfo", "-geoloc", "-valonly", "-b", "1", "-interp", "bilinear", dtm_tif, str(x), str(y)],
+        ["gdallocationinfo", "-geoloc", "-b", "1", dtm_tif, str(x), str(y)],
         capture_output=True, text=True, check=False,
     )
-    val = (out.stdout or "").strip()
     if out.returncode != 0:
         if sample_count < 3:
             print(f"sample fail rc={out.returncode} stdout={out.stdout!r} stderr={out.stderr!r}", file=sys.stderr)
             sample_count += 1
         skipped += 1
         continue
+    val_lines = (out.stdout or "").strip().splitlines()
+    if sample_count < 1:
+        print(f"sample raw out for ({x},{y}): {val_lines!r}", file=sys.stderr)
+        sample_count += 1
+    val = val_lines[-1].strip() if val_lines else ""
     try:
         dtm_z = float(val)
     except ValueError:
-        if sample_count < 3:
-            print(f"sample parse fail val={val!r} (x={x}, y={y})", file=sys.stderr)
-            sample_count += 1
         skipped += 1
         continue
 
@@ -424,14 +428,102 @@ print(f"updated={updated} skipped={skipped}")
 sys.exit(0 if updated > 0 else 2)
 PYEOF
 
+    # Non-fatal: keep the pipeline running even if enrichment fails
     if [ $? -ne 0 ]; then
-        georeference_log "ERROR: dist2dmt enrichment failed"
+        georeference_log "WARNING: dist2dmt enrichment returned non-zero; continuing without it"
         rm -f "$tmp_geojson"
-        return 1
+        return 0
     fi
 
     mv "$tmp_geojson" "$tree_info_geojson"
     georeference_log "dist2dmt added to $(grep -c '"dist2dmt"' "$tree_info_geojson") tree features"
+    return 0
+}
+
+
+create_tree_info_sqlite() {
+    local tree_info_geojson="$1"
+    local out_sqlite="$2"
+    local dtm_tif="$3"
+
+    georeference_log "writing parallel SQLite tree table to $out_sqlite"
+
+    singularity exec -B "$SCRATCHDIR":/data \
+        --env GEOJSON_IN="/data/$tree_info_geojson" \
+        --env SQLITE_OUT="/data/$out_sqlite" \
+        --env DTM_TIF="/data/$dtm_tif" \
+        ./pdal.img python3 - <<'PYEOF' 2>>"$LOG_FILE"
+import json, os, sqlite3, subprocess, sys
+from pathlib import Path
+
+geojson_path = Path(os.environ["GEOJSON_IN"])
+sqlite_path = Path(os.environ["SQLITE_OUT"])
+dtm_tif = os.environ["DTM_TIF"]
+
+with geojson_path.open() as fh:
+    data = json.load(fh)
+
+# Drop any existing table and rebuild (idempotent).
+if sqlite_path.exists():
+    sqlite_path.unlink()
+conn = sqlite3.connect(sqlite_path)
+cur = conn.cursor()
+cur.execute("""
+CREATE TABLE trees (
+    fid INTEGER PRIMARY KEY,
+    x REAL, y REAL, z REAL,
+    dist2dmt REAL,
+    props TEXT
+)
+""")
+
+def read_dtm(px, py):
+    try:
+        out = subprocess.run(
+            ["gdallocationinfo", "-geoloc", "-b", "1", dtm_tif, str(px), str(py)],
+            capture_output=True, text=True, check=False, timeout=30,
+        )
+        if out.returncode != 0:
+            return None
+        lines = (out.stdout or "").strip().splitlines()
+        return float(lines[-1].strip()) if lines else None
+    except (ValueError, subprocess.TimeoutExpired):
+        return None
+
+n_inserted = 0
+n_dtm_ok = 0
+for feat in data.get("features", []):
+    geom = feat.get("geometry", {})
+    if geom.get("type") != "Point":
+        continue
+    coords = geom.get("coordinates") or []
+    if len(coords) < 3:
+        continue
+    x, y, z = coords[0], coords[1], coords[2]
+    fid = feat.get("id")
+    props = feat.get("properties", {}) or {}
+    dtm_z = read_dtm(x, y)
+    dist = round(z - dtm_z, 3) if dtm_z is not None else None
+    if dtm_z is not None:
+        n_dtm_ok += 1
+    cur.execute(
+        "INSERT INTO trees (fid, x, y, z, dist2dmt, props) VALUES (?,?,?,?,?,?)",
+        (fid, x, y, z, dist, json.dumps(props, ensure_ascii=False)),
+    )
+    n_inserted += 1
+
+conn.commit()
+conn.close()
+print(f"sqlite rows inserted={n_inserted} dtm_sampled={n_dtm_ok}")
+PYEOF
+
+    RC=$?
+    if [ $RC -ne 0 ]; then
+        georeference_log "WARNING: sqlite writer returned $RC (non-fatal)"
+        return 0
+    fi
+    georeference_log "wrote $out_sqlite"
+    return 0
 }
 
 create_tree_info_geojson() {

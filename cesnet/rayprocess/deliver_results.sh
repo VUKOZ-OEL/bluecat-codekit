@@ -9,6 +9,9 @@ cp "$SOURCE_DATA.first.json" "$DATADIR/$SOURCE_DATA.first.json" &>> >(log_messag
 if [ -s "$SOURCE_DATA.dmt.tif" ]; then
     cp "$SOURCE_DATA.dmt.tif" "$DATADIR/$SOURCE_DATA.dmt.tif" &>> >(log_message)
 fi
+if [ -s "$SOURCE_DATA.sqlite" ]; then
+    cp "$SOURCE_DATA.sqlite" "$DATADIR/$SOURCE_DATA.sqlite" &>> >(log_message)
+fi
 
 cp $LOG_FILE log
 

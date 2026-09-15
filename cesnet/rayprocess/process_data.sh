@@ -178,11 +178,15 @@ create_dtm_geotiff "$TERRAIN_PLY" "$DTM_TIF" "0.1" || {
 }
 echo "$(date) DTM saved to $DTM_TIF" >> "$LOG_FILE"
 
-add_dist2dmt_to_treeinfo "$TREE_INFO_GEOJSON" "$DTM_TIF" || {
-    log_message "ERROR: failed to enrich $TREE_INFO_GEOJSON with dist2dmt"
-    return 1
-}
-echo "$(date) dist2dmt column added to $TREE_INFO_GEOJSON" >> "$LOG_FILE"
+# Non-fatal: keep processing even if dist2dmt fails (e.g., gdal quirks)
+add_dist2dmt_to_treeinfo "$TREE_INFO_GEOJSON" "$DTM_TIF" || \
+    log_message "WARNING: dist2dmt enrichment failed; pipeline continues"
+echo "$(date) dist2dmt attempt finished for $TREE_INFO_GEOJSON" >> "$LOG_FILE"
+
+# Parallel SQLite output (trees + dist2dmt), never fatal
+TREE_INFO_SQLITE="${SOURCE_DATA}.sqlite"
+create_tree_info_sqlite "$TREE_INFO_GEOJSON" "$TREE_INFO_SQLITE" "$DTM_TIF" || \
+    log_message "WARNING: sqlite writer failed; continuing"
 
 echo "lof in SCRATCHDIR:" >> $LOG_FILE
 echo "$(ls -lh)" >> $LOG_FILE
