@@ -398,39 +398,62 @@ read_dtm_xyz_pixels() {
 import sys, math
 
 def load_grid(xyz_path):
-    grid = {}
-    ncols = nrows = None
-    cell = None
+    # Grid indexed by integer (col, row) -- string float keys in the XYZ file
+    # are float64 with ~15 significant digits, so reconstructing them with
+    # x0 + col*cell never compares equal and every lookup returns None.
+    # Storing by (col, row) avoids that precision trap entirely.
+    grid = {}          # (col, row) -> z
+    xs_set = set()
+    ys_set = set()
     with open(xyz_path) as fh:
         for line in fh:
             parts = line.split()
             if len(parts) < 3:
                 continue
             x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
-            grid[(x, y)] = z
-    xs = sorted({xy[0] for xy in grid})
-    ys = sorted({xy[1] for xy in grid}, reverse=True)
+            xs_set.add(x)
+            ys_set.add(y)
+    xs = sorted(xs_set)
+    ys = sorted(ys_set, reverse=True)  # row 0 = northernmost (top of raster)
     if len(xs) < 2 or len(ys) < 2:
-        return None  # degenerate
-    cell = xs[1] - xs[0]
+        return None
     x0, y_top = xs[0], ys[0]
+    cell_x = xs[1] - xs[0]
+    cell_y = ys[0] - ys[1]              # positive (ys are descending)
+    # Second pass: assign integer col/row by nearest index, robust to
+    # sub-ulp shifts from GDAL's float formatting.
+    x_index = {x: i for i, x in enumerate(xs)}
+    y_index = {y: i for i, y in enumerate(ys)}
+    with open(xyz_path) as fh:
+        for line in fh:
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+            col = x_index.get(x)
+            row = y_index.get(y)
+            if col is None or row is None:
+                continue
+            grid[(col, row)] = z
     return {
-        "grid": grid, "xs": xs, "ys": ys, "x0": x0, "y_top": y_top,
-        "cell": cell, "ncols": len(xs), "nrows": len(ys),
+        "grid": grid, "x0": x0, "y_top": y_top,
+        "cell_x": cell_x, "cell_y": cell_y,
+        "ncols": len(xs), "nrows": len(ys),
     }
 
 
 def sample(g, fx, fy):
-    col = (fx - g["x0"]) / g["cell"]
-    row = (g["y_top"] - fy) / g["cell"]
+    # Bilinear interpolation at fractional (col, row) position
+    col = (fx - g["x0"]) / g["cell_x"]
+    row = (g["y_top"] - fy) / g["cell_y"]
     col_i, row_i = int(col), int(row)
     if not (0 <= col_i < g["ncols"] - 1 and 0 <= row_i < g["nrows"] - 1):
         return None
     dx, dy = col - col_i, row - row_i
-    z00 = g["grid"].get((g["x0"] + col_i * g["cell"], g["y_top"] - row_i * g["cell"]))
-    z10 = g["grid"].get((g["x0"] + (col_i + 1) * g["cell"], g["y_top"] - row_i * g["cell"]))
-    z01 = g["grid"].get((g["x0"] + col_i * g["cell"], g["y_top"] - (row_i + 1) * g["cell"]))
-    z11 = g["grid"].get((g["x0"] + (col_i + 1) * g["cell"], g["y_top"] - (row_i + 1) * g["cell"]))
+    z00 = g["grid"].get((col_i,     row_i))
+    z10 = g["grid"].get((col_i + 1, row_i))
+    z01 = g["grid"].get((col_i,     row_i + 1))
+    z11 = g["grid"].get((col_i + 1, row_i + 1))
     if z00 is None or z10 is None or z01 is None or z11 is None:
         return None
     return (z00 * (1 - dx) * (1 - dy)
