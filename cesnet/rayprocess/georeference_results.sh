@@ -352,46 +352,130 @@ sample_dtm_at_point() {
 }
 
 
+# ---------------------------------------------------------------------------
+# DTM helpers -- implementation notes
+#
+# The previous implementation used gdalallocationinfo with -geoloc, but the
+# GDAL CLI in pdal.img rejects that combination of flags at runtime (usage
+# message, rc=1).  The osgeo python bindings are not guaranteed to be
+# installed in the pdal singularity image either, so the safest path is:
+#
+#   1. gdal_translate the DMT to an ASCII grid (.xyz), which any GDAL build
+#      ships with.
+#   2. Pure-Python (no numpy/gdal) read of the grid + bilinear sample.
+#   3. Same reader drives both the geojson enrichment and the sqlite writer.
+#
+# The DMT at 10 cm resolution on a 25x25 m plot is ~250x250 px, so the ASCII
+# file is only a few MB -- perfectly fine for a scratch directory.
+# ---------------------------------------------------------------------------
+
+sample_dtm_at_point() {
+    # legacy shell helper kept for future use; prefers the .xyz path below
+    local dtm_xyz="$1" x="$2" y="$3"
+    awk -v x0="$x" -v y0="$y" '
+        { split($0, a, /[ ]+/); key=a[1]","a[2]; z[key]=a[3] }
+        END { print z[x0","y0] }' "$dtm_xyz"
+}
+
+
+dtm_to_xyz() {
+    local dtm_tif="$1" out_xyz="$2"
+    georeference_log "exporting DTM $dtm_tif to XYZ grid $out_xyz"
+    singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
+        gdal_translate -of XYZ "/data/$dtm_tif" "/data/$out_xyz" >> "$LOG_FILE" 2>&1 || {
+        georeference_log "ERROR: gdal_translate to XYZ failed for $dtm_tif"
+        return 1
+    }
+    [ -s "$out_xyz" ] || { georeference_log "ERROR: $out_xyz is empty"; return 1; }
+    return 0
+}
+
+
+# Shared Python helper: opens XYZ grid, samples a list of (x,y) points
+# Returns: dict mapping rounded (x,y) -> interpolated Z value, or None.
+read_dtm_xyz_pixels() {
+    cat <<'PYEOF'
+import sys, math
+
+def load_grid(xyz_path):
+    grid = {}
+    ncols = nrows = None
+    cell = None
+    with open(xyz_path) as fh:
+        for line in fh:
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+            grid[(x, y)] = z
+    xs = sorted({xy[0] for xy in grid})
+    ys = sorted({xy[1] for xy in grid}, reverse=True)
+    if len(xs) < 2 or len(ys) < 2:
+        return None  # degenerate
+    cell = xs[1] - xs[0]
+    x0, y_top = xs[0], ys[0]
+    return {
+        "grid": grid, "xs": xs, "ys": ys, "x0": x0, "y_top": y_top,
+        "cell": cell, "ncols": len(xs), "nrows": len(ys),
+    }
+
+
+def sample(g, fx, fy):
+    col = (fx - g["x0"]) / g["cell"]
+    row = (g["y_top"] - fy) / g["cell"]
+    col_i, row_i = int(col), int(row)
+    if not (0 <= col_i < g["ncols"] - 1 and 0 <= row_i < g["nrows"] - 1):
+        return None
+    dx, dy = col - col_i, row - row_i
+    z00 = g["grid"].get((g["x0"] + col_i * g["cell"], g["y_top"] - row_i * g["cell"]))
+    z10 = g["grid"].get((g["x0"] + (col_i + 1) * g["cell"], g["y_top"] - row_i * g["cell"]))
+    z01 = g["grid"].get((g["x0"] + col_i * g["cell"], g["y_top"] - (row_i + 1) * g["cell"]))
+    z11 = g["grid"].get((g["x0"] + (col_i + 1) * g["cell"], g["y_top"] - (row_i + 1) * g["cell"]))
+    if z00 is None or z10 is None or z01 is None or z11 is None:
+        return None
+    return (z00 * (1 - dx) * (1 - dy)
+            + z10 * dx * (1 - dy)
+            + z01 * (1 - dx) * dy
+            + z11 * dx * dy)
+PYEOF
+}
+
+
 add_dist2dmt_to_treeinfo() {
     local tree_info_geojson="$1"
     local dtm_tif="$2"
-    local tmp_geojson="${tree_info_geojson}.tmp"
+    local dtm_xyz tmp_geojson
 
     georeference_log "adding dist2dmt from $dtm_tif to $tree_info_geojson"
 
+    dtm_xyz="${dtm_tif%.tif}.xyz"
+    dtm_to_xyz "$dtm_tif" "$dtm_xyz" || {
+        georeference_log "WARNING: DTM XYZ export failed; skipping dist2dmt"
+        return 0
+    }
+
+    tmp_geojson="${tree_info_geojson}.tmp"
     cp "$tree_info_geojson" "$tmp_geojson" || return 1
 
-    # Use Python GDAL bindings (present in pdal.img) instead of the
-    # gdallocationinfo subprocess, which on the pdal.img GDAL version fails
-    # with just a usage message on every -geoloc sample. Reading via
-    # GetGeoTransform + ReadAsArray is stable across GDAL versions.
+    # Shared python code (helper) + caller script as one heredoc.  This keeps
+    # the XYZ loading logic identical between the geojson patch and the
+    # sqlite writer below.
     singularity exec -B "$SCRATCHDIR":/data \
         --env GEOJSON_IN="/data/$tmp_geojson" \
-        --env DTM_TIF="/data/$dtm_tif" \
-        ./pdal.img python3 - <<'PYEOF'
+        --env DTM_XYZ="/data/$dtm_xyz" \
+        ./pdal.img python3 - <<PYEOF
 import json, os, sys
-from pathlib import Path
 
-try:
-    from osgeo import gdal
-except ImportError:
-    print("osgeo.gdal not available; falling back to gdallocationinfo"
-          " is not supported here", file=sys.stderr)
-    sys.exit(3)
+$(read_dtm_xyz_pixels)
 
-gdal.UseExceptions()
-geojson_path = Path(os.environ["GEOJSON_IN"])
-dtm_tif = os.environ["DTM_TIF"]
+xyz_path = os.environ["DTM_XYZ"]
+geojson_path = os.environ["GEOJSON_IN"]
+g = load_grid(xyz_path)
+if g is None:
+    print("invalid/empty DTM grid", file=sys.stderr)
+    sys.exit(2)
 
-ds = gdal.Open(dtm_tif, gdal.GA_ReadOnly)
-band = ds.GetRasterBand(1)
-gt = ds.GetGeoTransform()   # (origin_x, px_w, rot1, origin_y, rot2, px_h)
-inv_gt = gdal.InvGeoTransform(gt)
-nodata = band.GetNoDataValue()
-band_arr = band.ReadAsArray()  # small: 25x25 m at 10 cm -> ~250x250 px
-ysize, xsize = band_arr.shape
-
-with geojson_path.open() as fh:
+with open(geojson_path) as fh:
     data = json.load(fh)
 
 updated = skipped = 0
@@ -404,22 +488,18 @@ for feat in data.get("features", []):
         continue
     x, y, tree_z = coords[0], coords[1], coords[2]
 
-    px, py = gdal.ApplyGeoTransform(inv_gt, x, y)
-    col, row = int(px), int(py)
-    if 0 <= col < xsize and 0 <= row < ysize:
-        z_val = float(band_arr[row, col])
-        if nodata is not None and z_val == nodata:
-            skipped += 1
-            continue
-        feat.setdefault("properties", {})["dist2dmt"] = round(tree_z - z_val, 3)
-        updated += 1
-    else:
+    dtm_z = sample(g, x, y)
+    if dtm_z is None:
         skipped += 1
+        continue
+    props = feat.setdefault("properties", {})
+    props.setdefault("dist2dmt", round(tree_z - dtm_z, 3))
+    updated += 1
 
-with geojson_path.open("w") as fh:
+with open(geojson_path, "w") as fh:
     json.dump(data, fh, ensure_ascii=False)
 
-print(f"updated={updated} skipped={skipped} raster={xsize}x{ysize}")
+print(f"updated={updated} skipped={skipped} grid={g['ncols']}x{g['nrows']}")
 PYEOF
 
     if [ $? -ne 0 ]; then
@@ -429,7 +509,7 @@ PYEOF
     fi
 
     mv "$tmp_geojson" "$tree_info_geojson"
-    georeference_log "dist2dmt added to $(grep -c '"dist2dmt"' "$tree_info_geojson") tree features"
+    georeference_log "dist2dmt added to $(grep -c '\"dist2dmt\"' "$tree_info_geojson") tree features"
     return 0
 }
 
@@ -438,47 +518,37 @@ create_tree_info_sqlite() {
     local tree_info_geojson="$1"
     local out_sqlite="$2"
     local dtm_tif="$3"
+    local dtm_xyz
 
     georeference_log "writing parallel SQLite tree table to $out_sqlite"
+
+    dtm_xyz="${dtm_tif%.tif}.xyz"
+    # XYZ may already exist if add_dist2dmt_to_treeinfo ran first; recreate only if missing
+    if [ ! -s "$dtm_xyz" ]; then
+        dtm_to_xyz "$dtm_tif" "$dtm_xyz" || {
+            georeference_log "WARNING: DTM XYZ export failed; sqlite will still be written"
+        }
+    fi
 
     singularity exec -B "$SCRATCHDIR":/data \
         --env GEOJSON_IN="/data/$tree_info_geojson" \
         --env SQLITE_OUT="/data/$out_sqlite" \
-        --env DTM_TIF="/data/$dtm_tif" \
-        ./pdal.img python3 - <<'PYEOF' 2>>"$LOG_FILE"
+        --env DTM_XYZ="/data/$dtm_xyz" \
+        ./pdal.img python3 - <<PYEOF 2>>"$LOG_FILE"
 import json, os, sqlite3, sys
-from pathlib import Path
 
-from osgeo import gdal
+$(read_dtm_xyz_pixels)
 
-gdal.UseExceptions()
-geojson_path = Path(os.environ["GEOJSON_IN"])
-sqlite_path = Path(os.environ["SQLITE_OUT"])
-dtm_tif = os.environ["DTM_TIF"]
+xyz_path = os.environ["DTM_XYZ"]
+geojson_path = os.environ["GEOJSON_IN"]
+sqlite_path = os.environ["SQLITE_OUT"]
 
-with geojson_path.open() as fh:
+g = load_grid(xyz_path) if os.path.exists(xyz_path) else None
+
+with open(geojson_path) as fh:
     data = json.load(fh)
 
-# Open DTM and pre-compute inverse geotransform so tree XY -> pixel is cheap
-ds = gdal.Open(dtm_tif, gdal.GA_ReadOnly)
-band = ds.GetRasterBand(1)
-gt = ds.GetGeoTransform()
-inv_gt = gdal.InvGeoTransform(gt)
-nodata = band.GetNoDataValue()
-band_arr = band.ReadAsArray()
-ysize, xsize = band_arr.shape
-
-def read_dtm(px, py):
-    col, row = int(px), int(py)
-    if 0 <= col < xsize and 0 <= row < ysize:
-        v = float(band_arr[row, col])
-        if nodata is not None and v == nodata:
-            return None
-        return v
-    return None
-
-# Build schema dynamically from the union of all property keys, so every
-# GeoJSON property becomes a real SQLite column (not a JSON-overflow blob).
+# Build schema: one column per GeoJSON property key, plus dist2dmt if absent
 prop_keys = []
 seen = set()
 for feat in data.get("features", []):
@@ -486,21 +556,18 @@ for feat in data.get("features", []):
         if k not in seen:
             seen.add(k)
             prop_keys.append(k)
-
-# dist2dmt is always present, computed from the DTM even if GeoJSON lacks it
 if "dist2dmt" not in seen:
     prop_keys.append("dist2dmt")
 
 col_defs = ", ".join('"%s" REAL' % k.replace('"', '""') for k in prop_keys)
 
-if sqlite_path.exists():
-    sqlite_path.unlink()
+if os.path.exists(sqlite_path):
+    os.unlink(sqlite_path)
 conn = sqlite3.connect(sqlite_path)
 cur = conn.cursor()
 cur.execute(
     'CREATE TABLE trees (fid INTEGER PRIMARY KEY, x REAL, y REAL, z REAL, %s)' % col_defs
 )
-
 placeholders = ",".join("?" for _ in prop_keys)
 insert_sql = (
     'INSERT INTO trees (fid, x, y, z, %s) VALUES (?,?,?,?,%s)'
@@ -519,10 +586,9 @@ for feat in data.get("features", []):
     fid = feat.get("id")
     props = dict(feat.get("properties") or {})
 
-    # Ensure dist2dmt is computed even when the geojson enrichment was skipped
-    if "dist2dmt" not in props:
-        px, py = gdal.ApplyGeoTransform(inv_gt, x, y)
-        dtm_z = read_dtm(px, py)
+    # Fill dist2dmt from DTM if missing (geojson enrichment may have failed)
+    if "dist2dmt" not in props and g is not None:
+        dtm_z = sample(g, x, y)
         if dtm_z is not None:
             props["dist2dmt"] = round(z - dtm_z, 3)
             n_dtm_ok += 1
