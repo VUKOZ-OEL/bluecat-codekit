@@ -48,6 +48,15 @@ save_first_point_coordinates "cloud.laz" "$FIRST_POINT_JSON" || {
 }
 echo "$(date) first-point coordinates saved to $FIRST_POINT_JSON" >> "$LOG_FILE"
 
+# All exported tree LAZ files share this one common LAS quantisation, taken
+# from the cloud processed by RayCloudTools' input.  Every segment is written
+# with this exact scale/offset so that downstream files stay on one lattice.
+save_las_scale_and_offset "cloud.laz" || {
+    echo "$(date) failed to read common LAS scale and offset from cloud.laz" >> "$LOG_FILE"
+    return 1
+}
+echo "$(date) common LAS scale and offset for tree exports saved" >> "$LOG_FILE"
+
 echo "$(date) raycloudtools processing start" >> $LOG_FILE
 # RUN raycloudtools in singularity to process the data
 
@@ -183,16 +192,20 @@ for segment_file in "$SEGMENT_DIR"/*.ply; do
     segment_relative="segments/$segment_name"
     segment_laz="${segment_relative%.ply}.laz"
     segment_traj="${segment_relative%.ply}.txt"
+    segment_rayexport_laz="${segment_relative%.ply}.rayexport.laz"
 
     run_logged "rayrender $segment_relative" \
         singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img \
         rayrender "/data/$segment_relative" right ends || return 1
+    # rayexport is kept for its trajectory side-output (.txt).  Its LAZ is
+    # written under a scratch name and discarded by georeference_tree_segment,
+    # because rayexport quantises points to a one-metre grid.
     run_logged "rayexport $segment_relative" \
         singularity exec -B "$SCRATCHDIR":/data ./raycloudtools.img \
-        rayexport "/data/$segment_relative" "/data/$segment_laz" "/data/$segment_traj" || return 1
-    georeference_log "rayexport completed without coordinate modification: $segment_relative -> $segment_laz"
-    georeference_rayexport_laz "$segment_laz" || {
-        echo "$(date) failed to georeference $segment_laz" >> "$LOG_FILE"
+        rayexport "/data/$segment_relative" "/data/$segment_rayexport_laz" "/data/$segment_traj" || return 1
+    georeference_log "rayexport trajectory captured in $segment_traj; rayexport LAZ is scratch-only"
+    georeference_tree_segment "$segment_relative" "$segment_laz" "$segment_rayexport_laz" || {
+        echo "$(date) failed to export georeferenced $segment_laz" >> "$LOG_FILE"
         return 1
     }
     run_logged "raywrap $segment_relative" \

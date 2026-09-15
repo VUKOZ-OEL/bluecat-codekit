@@ -127,23 +127,21 @@ log_cloud_state() {
 }
 
 validate_first_point_transform() {
-    local source_laz="$1"
+    local source_ply="$1"
     local laz_file="$2"
     local safe_name
     local source_diagnostic
     local output_diagnostic
     local source_x source_y source_z
     local output_x output_y output_z
-    local source_scale_x source_scale_y source_scale_z
-    local source_offset_x source_offset_y source_offset_z
     local output_scale_x output_scale_y output_scale_z
     local output_offset_x output_offset_y output_offset_z
     local comparison header_comparison
     local max_scale_steps="${GEOREFERENCE_MAX_SCALE_STEPS:-5}"
 
-    safe_name=$(basename "$source_laz")
+    safe_name=$(basename "$source_ply")
     safe_name="${safe_name%.*}"
-    source_diagnostic="segments/${safe_name}.georeference-rayexport-laz.json"
+    source_diagnostic="segments/${safe_name}.georeference-source-ply.json"
     output_diagnostic="segments/${safe_name}.georeference-output-laz.json"
 
     source_x=$(extract_first_point_dimension "$source_diagnostic" X)
@@ -152,12 +150,6 @@ validate_first_point_transform() {
     output_x=$(extract_first_point_dimension "$output_diagnostic" X)
     output_y=$(extract_first_point_dimension "$output_diagnostic" Y)
     output_z=$(extract_first_point_dimension "$output_diagnostic" Z)
-    source_scale_x=$(extract_first_point_dimension "$source_diagnostic" scale_x)
-    source_scale_y=$(extract_first_point_dimension "$source_diagnostic" scale_y)
-    source_scale_z=$(extract_first_point_dimension "$source_diagnostic" scale_z)
-    source_offset_x=$(extract_first_point_dimension "$source_diagnostic" offset_x)
-    source_offset_y=$(extract_first_point_dimension "$source_diagnostic" offset_y)
-    source_offset_z=$(extract_first_point_dimension "$source_diagnostic" offset_z)
     output_scale_x=$(extract_first_point_dimension "$output_diagnostic" scale_x)
     output_scale_y=$(extract_first_point_dimension "$output_diagnostic" scale_y)
     output_scale_z=$(extract_first_point_dimension "$output_diagnostic" scale_z)
@@ -170,9 +162,7 @@ validate_first_point_transform() {
         georeference_log "ERROR: unable to validate first point for $laz_file"
         return 1
     fi
-    if ! is_json_number "$source_scale_x" || ! is_json_number "$source_scale_y" || ! is_json_number "$source_scale_z" || \
-       ! is_json_number "$source_offset_x" || ! is_json_number "$source_offset_y" || ! is_json_number "$source_offset_z" || \
-       ! is_json_number "$output_scale_x" || ! is_json_number "$output_scale_y" || ! is_json_number "$output_scale_z" || \
+    if ! is_json_number "$output_scale_x" || ! is_json_number "$output_scale_y" || ! is_json_number "$output_scale_z" || \
        ! is_json_number "$output_offset_x" || ! is_json_number "$output_offset_y" || ! is_json_number "$output_offset_z"; then
         georeference_log "ERROR: unable to validate LAS scale/offset for $laz_file"
         return 1
@@ -183,21 +173,19 @@ validate_first_point_transform() {
         return 1
     fi
 
+    # Every exported tree LAZ must share the common cloud.laz quantisation:
+    # identical scale in all files, identical offset. Hard check, no tolerance.
     if header_comparison=$(awk \
-        -v ssx="$source_scale_x" -v ssy="$source_scale_y" -v ssz="$source_scale_z" \
-        -v sox="$source_offset_x" -v soy="$source_offset_y" -v soz="$source_offset_z" \
+        -v csx="$LAS_SCALE_X" -v csy="$LAS_SCALE_Y" -v csz="$LAS_SCALE_Z" \
+        -v cox="$LAS_OFFSET_X" -v coy="$LAS_OFFSET_Y" -v coz="$LAS_OFFSET_Z" \
         -v osx="$output_scale_x" -v osy="$output_scale_y" -v osz="$output_scale_z" \
-        -v oox="$output_offset_x" -v ooy="$output_offset_y" -v ooz="$output_offset_z" \
-        -v tx="$FIRST_POINT_X" -v ty="$FIRST_POINT_Y" -v tz="$FIRST_POINT_Z" '
+        -v oox="$output_offset_x" -v ooy="$output_offset_y" -v ooz="$output_offset_z" '
         function abs(value) { return value < 0 ? -value : value }
         BEGIN {
-            expected_ox = sox + tx
-            expected_oy = soy + ty
-            expected_oz = soz + tz
-            printf "scale before=(%.15g,%.15g,%.15g) after=(%.15g,%.15g,%.15g); offset expected=(%.15g,%.15g,%.15g) actual=(%.15g,%.15g,%.15g)", \
-                ssx, ssy, ssz, osx, osy, osz, expected_ox, expected_oy, expected_oz, oox, ooy, ooz
-            scale_ok = abs(osx - ssx) < 1e-15 && abs(osy - ssy) < 1e-15 && abs(osz - ssz) < 1e-15
-            offset_ok = abs(oox - expected_ox) < 1e-12 && abs(ooy - expected_oy) < 1e-12 && abs(ooz - expected_oz) < 1e-12
+            printf "scale common=(%.15g,%.15g,%.15g) output=(%.15g,%.15g,%.15g); offset common=(%.15g,%.15g,%.15g) output=(%.15g,%.15g,%.15g)", \
+                csx, csy, csz, osx, osy, osz, cox, coy, coz, oox, ooy, ooz
+            scale_ok = abs(osx - csx) < 1e-15 && abs(osy - csy) < 1e-15 && abs(osz - csz) < 1e-15
+            offset_ok = abs(oox - cox) < 1e-12 && abs(ooy - coy) < 1e-12 && abs(ooz - coz) < 1e-12
             exit(scale_ok && offset_ok ? 0 : 1)
         }
     '); then
@@ -216,7 +204,7 @@ validate_first_point_transform() {
         -v sx="$source_x" -v sy="$source_y" -v sz="$source_z" \
         -v ox="$output_x" -v oy="$output_y" -v oz="$output_z" \
         -v tx="$FIRST_POINT_X" -v ty="$FIRST_POINT_Y" -v tz="$FIRST_POINT_Z" \
-        -v scale_x="$source_scale_x" -v scale_y="$source_scale_y" -v scale_z="$source_scale_z" \
+        -v scale_x="$LAS_SCALE_X" -v scale_y="$LAS_SCALE_Y" -v scale_z="$LAS_SCALE_Z" \
         -v max_scale_steps="$max_scale_steps" '
         function abs(value) { return value < 0 ? -value : value }
         BEGIN {
@@ -245,58 +233,60 @@ validate_first_point_transform() {
     fi
 }
 
-georeference_rayexport_laz() {
-    local laz_file="$1"
-    local directory
-    local filename
-    local temporary_file
+georeference_tree_segment() {
+    local ply_file="$1"
+    local laz_file="$2"
+    local rayexport_laz="$3"
     local matrix
-    local output_offset_x output_offset_y output_offset_z
 
-    directory=$(dirname "$laz_file")
-    filename=$(basename "$laz_file")
-    temporary_file="$directory/.${filename%.laz}.georeferenced.laz"
     matrix="1 0 0 $FIRST_POINT_X 0 1 0 $FIRST_POINT_Y 0 0 1 $FIRST_POINT_Z 0 0 0 1"
 
-    # Preserve rayexport's exact integer representation. Adding the same shift
-    # to point coordinates and LAS header offsets keeps every stored integer:
-    # (xyz + shift - (offset + shift)) / scale == (xyz - offset) / scale.
-    if ! save_las_scale_and_offset "$laz_file"; then
-        return 1
-    fi
-    output_offset_x=$(awk -v offset="$LAS_OFFSET_X" -v shift="$FIRST_POINT_X" 'BEGIN { printf "%.17g", offset + shift }')
-    output_offset_y=$(awk -v offset="$LAS_OFFSET_Y" -v shift="$FIRST_POINT_Y" 'BEGIN { printf "%.17g", offset + shift }')
-    output_offset_z=$(awk -v offset="$LAS_OFFSET_Z" -v shift="$FIRST_POINT_Z" 'BEGIN { printf "%.17g", offset + shift }')
+    # RayCloudTools rayexport writes its LAZ ($rayexport_laz) with a one-metre
+    # LAS scale and irreversibly rounds point coordinates to whole metres.  That
+    # file must therefore NOT be kept as the geometric result — doing so would
+    # re-voxelise every tree.  The rayexport step is kept in the pipeline
+    # because it also produces the per-segment trajectory text file, but its
+    # LAZ output is only a temporary artefact that we discard after the
+    # georeferenced LAZ is built directly from the full-precision PLY.
 
-    georeference_log "georeferencing rayexport result $laz_file without changing its integer quantisation"
+    georeference_log "exporting georeferenced $laz_file directly from PLY $ply_file (bypassing rayexport LAZ quantisation)"
     georeference_log "applying matrix: $matrix"
-    georeference_log "preserving rayexport scale=($LAS_SCALE_X,$LAS_SCALE_Y,$LAS_SCALE_Z)"
-    georeference_log "shifting LAS offset from ($LAS_OFFSET_X,$LAS_OFFSET_Y,$LAS_OFFSET_Z) to ($output_offset_x,$output_offset_y,$output_offset_z)"
-    log_cloud_state "$laz_file" "rayexport-laz"
+    georeference_log "common LAS quantisation for ALL tree exports: scale=($LAS_SCALE_X,$LAS_SCALE_Y,$LAS_SCALE_Z) offset=($LAS_OFFSET_X,$LAS_OFFSET_Y,$LAS_OFFSET_Z)"
+    log_cloud_state "$ply_file" "source-ply"
 
+    # Write every tree LAZ with the SAME scale and offset read from cloud.laz,
+    # so all downstream files share one common quantisation lattice.  PDAL reads
+    # the original float PLY coordinates, the transformation filter adds the
+    # first-point shift in floating point, and only then is the LAS integer
+    # quantisation applied — no intermediate rounding step exists.
     if ! singularity exec -B "$SCRATCHDIR":/data ./pdal.img \
-        pdal translate "/data/$laz_file" "/data/$temporary_file" transformation \
+        pdal translate "/data/$ply_file" "/data/$laz_file" transformation \
         --filters.transformation.matrix="$matrix" \
-        --writers.las.forward=all \
+        --writers.las.compression=true \
+        --writers.las.minor_version=2 \
+        --writers.las.dataformat_id=3 \
+        --writers.las.extra_dims=all \
         --writers.las.scale_x="$LAS_SCALE_X" \
         --writers.las.scale_y="$LAS_SCALE_Y" \
         --writers.las.scale_z="$LAS_SCALE_Z" \
-        --writers.las.offset_x="$output_offset_x" \
-        --writers.las.offset_y="$output_offset_y" \
-        --writers.las.offset_z="$output_offset_z" >> "$LOG_FILE" 2>&1; then
-        georeference_log "ERROR: PDAL georeference failed for rayexport result $laz_file"
+        --writers.las.offset_x="$LAS_OFFSET_X" \
+        --writers.las.offset_y="$LAS_OFFSET_Y" \
+        --writers.las.offset_z="$LAS_OFFSET_Z" >> "$LOG_FILE" 2>&1; then
+        georeference_log "ERROR: PDAL PLY-to-georeferenced-LAZ export failed for $ply_file"
         return 1
     fi
 
-    if ! mv "$temporary_file" "$laz_file"; then
-        georeference_log "ERROR: unable to replace $laz_file with georeferenced result"
-        return 1
-    fi
     log_cloud_state "$laz_file" "output-laz"
-    if ! validate_first_point_transform "$laz_file" "$laz_file"; then
+    if ! validate_first_point_transform "$ply_file" "$laz_file"; then
         return 1
     fi
-    georeference_log "completed georeference for rayexport result $laz_file"
+
+    # rayexport's quantised LAZ is no longer needed; keep only the trajectory.
+    if [ -n "$rayexport_laz" ] && [ "$rayexport_laz" != "$laz_file" ] && [ -f "$rayexport_laz" ]; then
+        rm -f "$rayexport_laz"
+        georeference_log "discarded quantised rayexport LAZ $rayexport_laz (trajectory text kept)"
+    fi
+    georeference_log "completed georeferenced export for $laz_file"
 }
 
 create_tree_info_geojson() {
