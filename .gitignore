@@ -33,3 +33,8 @@ desktop.ini
 test_runs_output/
 test_runs_outputs/
 results/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
