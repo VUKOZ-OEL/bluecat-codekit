@@ -114,3 +114,56 @@ scale. Source: [rct_pipeline_wanxinyang].
 
 † RCT discussion: `raysplit grid` cuts rays at grid planes (alpha=0 non-returns),
 tree IDs repeat per tile, so merge must re-key by geometry, not trust IDs.
+
+---
+
+## Guarantee: nothing lost, nothing duplicated ("never 2x/4x")
+
+Two independent invariants, checked separately:
+
+**1. Point level (full-plot overlay / DTM).** The nominal tile extents
+partition the plane: `tile(i,j) = [ox+i·L, ox+(i+1)·L) × [oy+j·L, oy+(j+1)·L)`
+(half-open). Every input point lies in exactly one nominal tile. After
+processing, crop back to the nominal extent with **half-open bounds `[min,
+max−ε)`, ε = one LAS lattice step** so a point sitting exactly on the seam is
+counted once (the lower tile), never twice and never dropped. Buffer points are
+not lost — they are *owned* by the neighbour's tile and emitted there. All
+pre-processing that is **not boundary-safe runs once on the full cloud before
+tiling in streaming mode** (`filters.voxeldownsize`): per-tile voxelization is
+not commutative with whole-cloud voxelization and would double-count/reduce
+seam voxels. `ferry X→GpsTime` is per-point, safe either way.
+
+**2. Tree level (treeInfo / per-tree LAZ).** Owner rule + geometric dedup key.
+```
+owner(t) = nominal cell containing the tree's georeferenced base
+           (floor((x−ox)/L), floor((y−oy)/L))
+key(t)   = (round(x_base, δ), round(y_base, δ), round(h, δh))   # GLOBAL frame
+```
+A real tree straddling a seam is detected in 2 (edge) or 4 (corner) tiles and
+its duplicate detections share the **same key** → collapse to one. Uniqueness
+is decided by the owner (bijective: one tree → one nominal cell → one owner);
+*content* (which detection's per-tree PLY/LAZ we ship) is picked as the *best*
+among the duplicates (most points / lowest decimation level, since the pipeline
+retries under RAM pressure). Global ID = `(owner_tile, local_index)` — never a
+raw local index, which restarts at 0 per tile. No reliance on processing order.
+
+**Preconditions for the key to work (must hold, or the guarantee breaks):**
+* **One global first-point offset** shared by every tile — NOT the per-tile
+  first point that `rayimport --remove_start_pos` would otherwise use. Two
+  tiles with different offsets give the same tree different absolute
+  coordinates → the key fails to match → false 2x/4x.
+* **Common LAS scale/offset** (already `save_las_scale_and_offset` from
+  `cloud.laz`) so the quantized key lattice is identical across tiles.
+
+δ must satisfy `noise < δ < min tree spacing` (empirically δ ≈ 0.5 m for MLS
+bases, height as secondary key); fallback nearest-neighbour match within ε if
+bases are unstable (slope, leaning trunks).
+
+**Verification (must pass before delivery):**
+```
+Σ nominal tile point counts == input point count (± LAZ rounding)
+merged treeInfo: GROUP BY key → every group has exactly one owner (2 owners = FAIL)
+no two final bases closer than δ          (missed-merge detector)
+sample plot 2022_q34_sample_25x25: NON-tiled run == tiled run
+    in tree count, base coords, point counts     (gold-standard cross-check)
+```
