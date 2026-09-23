@@ -167,3 +167,38 @@ no two final bases closer than δ          (missed-merge detector)
 sample plot 2022_q34_sample_25x25: NON-tiled run == tiled run
     in tree count, base coords, point counts     (gold-standard cross-check)
 ```
+
+---
+
+## Implementation status (2026-09-23, phase 2 in progress)
+
+Working skeleton of the automatic tiling pipeline is implemented in
+`src/rct_auto_tiling/` and verified **end-to-end locally** on the
+`2022_q34_sample_25x25` cloud (20,853,952 pts, PLY):
+
+| step | script | local result |
+| --- | --- | --- |
+| 1 split | `step1_tile_split.py` | streaming, DO-sec grid, buffered tiles, per-tile owner map |
+| 2 rayprocess | `mock_rayprocess.py` (local stub) | realistic per-tile treeInfo duplicates (buffer overlap) |
+| 3 merge | `step2_merge_segments.py` | 114 unique trees from 538 raw detections (424 collapsed) |
+| 4 verify | `verify_point_counts.py` | **PASS**: Σ nominal tiles == input (20,853,952 == 20,853,952, delta 0) |
+
+Orchestration: `run_auto_tiling.sh` (split → per-tile RCT/PY → merge → verify),
+env-switchable rayprocess (`RCT_RAYPROCESS`). Commits `118b35d`, `ab5fdd3`
+(pushed).
+
+### Verified facts from the implementation
+* Point-level no-loss/no-dupe invariant PASSES on real data — the exact
+  reconciliation the owner asked for: `input count == Σ(nominal tile counts)`.
+* Merge/dedupe: 114 trees out of 538 raw detections, unique global IDs 1..114,
+  no dup, no loss. δ=0.1 m used locally (min observed tree-spacing on q34 is
+  ~0.16 m, so δ=0.5 m would collide — the δ must be data-derived, not fixed).
+* Buffer amplification on 20.85M pts / 10 m tile / 10 m buffer: 120.4M buffered
+  writes (5.8×) — the reason tile/length vs. buffer ratio matters on MetaCentrum.
+
+### Open for phase 2→3 (MetaCentrum)
+* `L` (tile length) and `B` (buffer) heuristics for 2–100 Ha plots; B=10 m
+  (user-set) vs. the 5 m in the RCT reference script.
+* RAM cap 256 GB on PBS: pick `L` so `points_in_tile × bytes/pt` stays under
+  the cap; the splitter itself is O(streaming) so it costs nothing.
+* PLY-LAS: real per-tile rayprocess georef run (needs RCT on a node, not local).
