@@ -1,0 +1,81 @@
+# External source registry for rct_auto_tiling research
+# Schema: stable source IDs used in docs/notes_rct_auto_tiling.md and STATUS_*.md
+schema_version: 1
+
+sources:
+  pdal_filters_splitter:
+    title: "PDAL — filters.splitter"
+    url: "https://pdal.org/en/latest/stages/filters.splitter.html"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Splits a point cloud into square tiles; length, origin_x/y, buffer options (buffer default 0)."
+
+  pdal_apps_tile:
+    title: "PDAL — tile app"
+    url: "https://pdal.io/en/latest/apps/tile.html"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Streaming-mode splitter; --length/--origin_x/--origin_y/--buffer; filename template with # placeholder."
+
+  lastools_lastile:
+    title: "LAStools — lastile"
+    url: "https://downloads.rapidlasso.de/html/lastile_README.html"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "-tile_size, -buffer, -reversible/-reverse_tiling, -remove_buffer, -flag_as_withheld, -full_bb."
+
+  lastools_buffers_blog:
+    title: "rapidlasso — Use Buffers when Processing LiDAR in Tiles"
+    url: "https://rapidlasso.de/use-buffers-when-processing-lidar-in-tiles/"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Why buffers are needed for distance/neighbourhood operations; TIN edges, artifacts, -use_tile_bb."
+
+  lastools_lasduplicate:
+    title: "LAStools — lasduplicate"
+    url: "https://downloads.rapidlasso.de/html/lasduplicate_README.html"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Dedupe overlapping tiles: -unique_xyz, -nearby d, -merged."
+
+  rct_rayextract_trees_large:
+    title: "RayCloudTools — scripts/rayextract_trees_large.sh"
+    url: "https://github.com/csiro-robotics/raycloudtools/blob/master/scripts/rayextract_trees_large.sh"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Reference tiling impl: raysplit grid L,L,0 with 5 m overlap; rayextract terrain+trees per tile; treecombine merge."
+
+  rct_discussion_33:
+    title: "RayCloudTools Discussion #33 — per-tile ray/segment handling"
+    url: "https://github.com/csiro-robotics/raycloudtools/discussions/33"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "raysplit grid cuts rays at tile planes (alpha=0 non-returns); tree ids repeat per tile; use raysplit seg_colour per tile."
+
+  rct_doi_2021:
+    title: "RayCloudTools paper (IEEE Access 2021)"
+    url: "https://doi.org/10.1109/access.2021.3084954"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Serial processing for rayimport/raydecimate/rayrestore/rayexport (memory bound ~1 GB); raycombine merge types; raysplit grid."
+
+  lidr_lascatalog_engine:
+    title: "lidR — LAScatalog processing engine"
+    url: "https://cran.r-project.org/web/packages/lidR/vignettes/lidR-LAScatalog-engine.html"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Chunk + buffer processing for tree segmentation; buffer ensures edge trees detected; opt_chunk_size."
+
+  pythonlidar_buffered_tiling:
+    title: "pythonLiDAR — Buffered Tiling to Avoid Edge Artefacts"
+    url: "https://pythonlidar.com/batch-automation-cloud-integration/tile-indexing-and-merging/buffered-tiling-to-avoid-edge-artefacts"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Process buffered, crop back to nominal extent before writing; otherwise buffer points written twice."
+
+  rct_pipeline_wanxinyang:
+    title: "wanxinyang/rct-pipeline — tiled PLY + raycloudtools"
+    url: "https://github.com/wanxinyang/rct-pipeline"
+    accessed: "2026-09-23"
+    verified: true
+    notes: "Plot-scale Point2PLY, user-defined tile/overlap; batches raycloudtools per tile in docker."
