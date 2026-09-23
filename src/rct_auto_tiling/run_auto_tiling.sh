@@ -41,7 +41,14 @@ python "$SRC/step1_tile_split.py" "$INPUT" --length "$LENGTH" --buffer "$BUFFER"
 # run it; else simulate by copying the input's treeInfo to each tile so step 2
 # can be exercised (LOCAL TEST ONLY).
 echo "=== per-tile processing (rayprocess) ==="
-if [ -n "${RCT_RAYPROCESS:-}" ]; then
+if [ "${PBS_MODE:-0}" = "1" ]; then
+    # --- MetaCentrum: one PBS array job per tile, RAM-capped at 256 GB ---
+    N="$(ls "$TILE_DIR"/tile_*.ply | wc -l | tr -d ' ')"
+    echo "  submitting PBS array of $N tiles (RAM cap 256 GB)"
+    qsub -A "$PBS_ACCOUNT" -l "mem=256gb,ncpus=$PBS_CPUS" \
+        -J 1-"$N" -v "TILE_DIR=$TILE_DIR,STAGE=$STAGE,SRC=$SRC,INPUT=$INPUT" \
+        "$SRC/pbs_tile_job.sh"
+elif [ -n "${RCT_RAYPROCESS:-}" ]; then
     for tf in "$TILE_DIR"/tile_*.ply; do
         base="$(basename "$tf" .ply)"
         echo "  rayprocess $tf -> $STAGE/${base}.trees.json"
