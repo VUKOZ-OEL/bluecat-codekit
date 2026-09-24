@@ -250,3 +250,22 @@ Key RCT CLI facts confirmed: rayimport takes `cloud trajectory` (or `cloud
 0,0,0`), writes `<name>_raycloud.ply`; rayextract terrain takes `cloud`;
 rayextract trees takes `cloud ground_mesh`; no `-o` — outputs are
 sibling files of the same name.
+
+## 10x10 m verification (2026-09-24, 20x bigger than the first test)
+
+Ran the full pipeline on a **10x10 m crop (4,352,543 pts, ~43.5k pts/m2 MLS —
+a real-tile-sized sample, 20x the previous 5x5 test)**:
+
+| step | result |
+| --- | --- |
+| split (2x2, L=5, B=10) | **PASS**: Σ nominal == input, delta 0 |
+| real RCT (rayimport/terrain/trees) | 2.6 s + 6.3 s + 17.6 s; **4,352,543 rays → segmented 4,352,543 (delta 0)** |
+| trees found | 9 (dominants to 40.2 m, understorey 0.2 m) |
+| verify_point_counts | **PASS**: input 4,352,543 == Σ nominal tiles 4,352,543 |
+| merge (single tile) | 9 unique / 9 detections |
+
+Point invariant holds **through the real RayCloudTools step itself** on a
+tile-sized cloud (input ply == ray cloud == segmented ply, all 4,352,543).
+Combined with the 4-tile 5x5 run (11 real trees, synthetic dup → 5 unique),
+the no-loss / no-2x guarantee is verified both at the point level and at the
+tree level on real RCT output.
