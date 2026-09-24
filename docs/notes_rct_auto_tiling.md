@@ -357,3 +357,17 @@ Bugs found & fixed during this work:
 Zofin full run (9 tiles, 69.1M pts): 68,946,215 unique points written
 (tree points + unlabelled), round-trip exact (pt_map == done_keys ==
 written); dedup skipped 58,738,059 duplicate tile-buffer/ray occurrences.
+
+Final Zofin result (after the base-distance gate on unions): 2,266
+unique trees (from 2,776 raw detections across 9 tiles), 51,034,566 tree
+points + 17,911,649 unlabelled (terrain/residual) points, exact
+round-trip. Output: `tree_<gid>.laz` (compressed LAZ, pf 3, per-tree RGB
+colour) + `unlabelled_<n>.laz` chunks + `manifest.json` (base + point
+count per tree). Biggest tree: 1.38M pts, ~21x21 m crown — no mega-merge
+artefacts. Heights: median 3.9 m, 167 trees > 20 m, 132 regen < 1 m — a
+plausible natural-forest structure for Zofin.
+Threshold calibration data (shared-point pair stats): real duplicate
+pairs (>100k shared points) all have base distances 0.1–0.7 m; pairs
+metres apart are canopy-contact chains and must NOT be unioned. Defaults:
+`--min-shared 50`, `--dup-frac 0.05` (over the sum of both sizes),
+`--base-max 1.0` m.
