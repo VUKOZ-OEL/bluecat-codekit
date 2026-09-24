@@ -202,3 +202,16 @@ env-switchable rayprocess (`RCT_RAYPROCESS`). Commits `118b35d`, `ab5fdd3`
 * RAM cap 256 GB on PBS: pick `L` so `points_in_tile × bytes/pt` stays under
   the cap; the splitter itself is O(streaming) so it costs nothing.
 * PLY-LAS: real per-tile rayprocess georef run (needs RCT on a node, not local).
+
+## Docker image finding (2026-09-23, late)
+
+The documented image `ghcr.io/csiro-robotics/raycloudtools:latest` is
+**broken as published**: every `/usr/local/bin/ray*-0.1.0` is a 0-byte file
+(symlink targets empty), `/deps` is empty — there are NO working RCT
+binaries in the image (`rayimport` exits 0, writes nothing). Only tag is
+`latest` (no older tag to fall back to). Workaround: build from source —
+`working/raycloudtools-src/docker/Dockerfile` is valid (ubuntu 26.04 + cmake
++ libnabo + RCT + TreeTools); `docker build -f docker/Dockerfile -t
+raycloudtools:local .` was started locally (2026-09-24 09:0x) and assumed to
+work; verify before any MetaCentrum run. On MetaCentrum prefer the apptainer
+build from source or another prebuilt image, do NOT trust `:latest`.
