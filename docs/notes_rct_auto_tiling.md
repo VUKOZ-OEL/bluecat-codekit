@@ -215,3 +215,38 @@ binaries in the image (`rayimport` exits 0, writes nothing). Only tag is
 raycloudtools:local .` was started locally (2026-09-24 09:0x) and assumed to
 work; verify before any MetaCentrum run. On MetaCentrum prefer the apptainer
 build from source or another prebuilt image, do NOT trust `:latest`.
+
+## Real-RayCloudTools verification (2026-09-24)
+
+Built a **working** RCT image from source:
+`working/raycloudtools-src/docker/Dockerfile` → `raycloudtools:local`
+(build RC=0; `rayimport-0.1.0` is a real ELF, not a 0-byte stub). All from
+source id: [rct_github_repo], usage from [rct_docker_quickstart].
+
+Real per-tile RCT run on 4 adjacent 5x5 m crops of the q34 sample
+(746k–1.29M pts each, ~30k pts/m2, MLS):
+* `rayimport cloud.ply 0,0,0` → `_raycloud.ply` (same point count — no loss)
+* `rayextract terrain` → `_raycloud_mesh.ply` (ground mesh)
+* `rayextract trees raycloud mesh` → segmented.ply + trees.txt (+ mesh)
+* Point-round-trip: crop → rayimport → segmented all 746,798 pts (no loss)
+* trees per tile: 3 / 2 / 5 / 1 = 11 total; bases in global coords
+* `trees_txt_to_geojson.py` converts trees.txt → treeInfo GeoJSON
+* merge (δ=0.1) on 4 real tiles: 11 unique / 11 detections (0 dup — real
+  trees on this crop sit inside tile nominal extents, so buffer overlap
+  never duplicated them)
+* synthetic dup test with real bases: 5 tiles / 14 detections → 5 unique,
+  duplicate bases correctly collapsed (the "never 2x" guarantee, on real coords)
+
+### Command recipes (for MetaCentrum / PBS tile jobs)
+```
+rayimport tile_x_y.ply 0,0,0
+rayextract terrain tile_x_y_raycloud.ply
+rayextract trees tile_x_y_raycloud.ply tile_x_y_raycloud_mesh.ply
+trees_txt_to_geojson.py tile_x_y_raycloud_trees.txt tile_x_y.trees.geojson
+step2_merge_segments.py --delta 0.1 --out merged.geojson --tiles stage/*.trees.geojson
+```
+
+Key RCT CLI facts confirmed: rayimport takes `cloud trajectory` (or `cloud
+0,0,0`), writes `<name>_raycloud.ply`; rayextract terrain takes `cloud`;
+rayextract trees takes `cloud ground_mesh`; no `-o` — outputs are
+sibling files of the same name.

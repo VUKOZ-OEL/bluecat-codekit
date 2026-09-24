@@ -86,3 +86,17 @@ sources:
     accessed: "2026-09-23"
     verified: true
     notes: "filters.splitter with explicit halo duplicates neighbouring points into each tile; crop on write to avoid double-counting."
+
+  rct_github_repo:
+    title: "csiro-robotics/raycloudtools (source + docker build)"
+    url: "https://github.com/csiro-robotics/raycloudtools"
+    accessed: "2026-09-24"
+    verified: true
+    notes: "docker/Dockerfile builds a working RayCloudTools image from source (ubuntu 26.04 + cmake + libnabo + RCT + TreeTools). Used to build raycloudtools:local after :latest proved broken."
+
+  rct_docker_quickstart:
+    title: "RayCloudTools README — Docker & usage"
+    url: "https://github.com/csiro-robotics/raycloudtools/blob/master/README.md"
+    accessed: "2026-09-24"
+    verified: true
+    notes: "rayimport <cloud> <traj>; output = same-name _raycloud.ply; rayextract <terrain|trees> <cloud> [mesh]; trees.txt per-tree text format (one row per tree, segments as 6-col groups)."
