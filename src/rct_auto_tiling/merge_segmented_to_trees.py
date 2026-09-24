@@ -180,9 +180,12 @@ def main():
     ap.add_argument("--quant", type=float, default=0.01)
     ap.add_argument("--min-shared", type=int, default=50,
                     help="min shared points for a duplicate pair candidate")
-    ap.add_argument("--dup-frac", type=float, default=0.3,
-                    help="shared/min(tree sizes) fraction above which two "
-                         "global ids are the same physical tree")
+    ap.add_argument("--dup-frac", type=float, default=0.05,
+                    help="shared/(sum of both tree sizes) fraction above "
+                         "which two global ids are the same physical tree")
+    ap.add_argument("--base-max", type=float, default=1.0,
+                    help="max base distance (m) for a duplicate pair; "
+                         "blocks single-linkage chains through canopies")
     ap.add_argument("--dump-shared", default=None,
                     help="optional path to dump per-pair shared-point stats")
     args = ap.parse_args()
@@ -252,7 +255,11 @@ def main():
         if v is not None and v >= 0:
             totals[v] = totals.get(v, 0) + 1
 
-    # union only high-overlap pairs
+    # union only high-overlap pairs (point-proof + base-proximity gate).
+    # The base gate stops single-linkage chains through the canopy: real
+    # duplicate detections have bases within ~0.7 m of each other, while a
+    # chain that merges distant trees through shared canopy points jumps
+    # many metres per hop.
     parent = {}
     def find(a):
         parent.setdefault(a, a)
@@ -268,10 +275,14 @@ def main():
             else:
                 parent[ra] = rb
     n_unions = 0
-    for (a, b), c in sorted(shared.items()):
+    for (a, b), c in sorted(shared.items(), key=lambda kv: -kv[1]):
         if c < args.min_shared:
             continue
-        frac = c / max(1, min(totals.get(a, 0), totals.get(b, 0)))
+        ax, ay, _ = gbases.get(a, (0, 0, None))
+        bx, by, _ = gbases.get(b, (0, 0, None))
+        if math.hypot(ax - bx, ay - by) > args.base_max:
+            continue
+        frac = c / max(1, totals.get(a, 0) + totals.get(b, 0))
         if frac >= args.dup_frac:
             union(a, b)
             n_unions += 1
@@ -287,8 +298,8 @@ def main():
         if v is not None and v >= 0 and v in parent:
             pt_map[k] = find(v)
     print(f"point-proof dedup: {n_unions} tree-id pairs merged "
-          f"(min_shared={args.min_shared}, dup_frac={args.dup_frac}; "
-          f"{len(shared)} sharing pairs seen)")
+          f"(min_shared={args.min_shared}, dup_frac={args.dup_frac}, "
+          f"base_max={args.base_max}; {len(shared)} sharing pairs seen)")
 
     # ---- Pass B: write each point once -----------------------------------
     print("\nPass B: writing per-tree LAZ ...")
