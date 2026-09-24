@@ -238,8 +238,19 @@ def main():
     done_keys = set()
 
     FLUSH = 2_000_000
+    tree_count = 0   # running: physical pts assigned to a tree
+    unlab_count = 0  # running: physical pts with no tree anywhere
+    unlab_chunk = 0  # unlabelled_<chunk>.laz counter
+    def flush_unlab(rows):
+        nonlocal written, unlab_chunk
+        if not rows:
+            return
+        write_las(os.path.join(args.outdir, f"unlabelled_{unlab_chunk:04d}.laz"),
+                  [(r[0], r[1], r[2]) for r in rows], colour=(90, 90, 90))
+        written += len(rows)
+        unlab_chunk += 1
     def flush(gid):
-        nonlocal written
+        nonlocal written, tree_count
         rows = tree_rows.pop(gid, [])
         if rows:
             # colour = per-tree colour (convertIntToColour(global id))
@@ -252,9 +263,7 @@ def main():
         for gid in list(tree_rows):
             flush(gid)
         if unlab_rows:
-            write_las(os.path.join(args.outdir, "unlabelled.laz"),
-                      [(r[0], r[1], r[2]) for r in unlab_rows], colour=(90, 90, 90))
-        written += len(unlab_rows)
+            flush_unlab(unlab_rows)
 
     try:
         for ti, tj, seg, mapping in tiles:
@@ -279,18 +288,19 @@ def main():
                         gid = pt_map.get(k, -1)
                         if gid >= 0:
                             tree_rows.setdefault(gid, []).append((x, y, z))
+                            tree_count += 1
                             if len(tree_rows[gid]) >= FLUSH:
                                 flush(gid)
                         else:
                             unlab_rows.append((x, y, z))
+                            unlab_count += 1
                             if len(unlab_rows) >= FLUSH:
-                                write_las(os.path.join(args.outdir, "unlabelled.laz"),
-                                          [(r[0], r[1], r[2]) for r in unlab_rows],
-                                          colour=(90, 90, 90))
+                                flush_unlab(unlab_rows)
                                 unlab_rows = []
             print(f"  pass B tile [{ti},{tj}] done (written {written:,}, skip {skip:,})")
     finally:
         flush_all()
+    print(f"DEBUG: pt_map={len(pt_map):,} done_keys={len(done_keys):,} assigned tree pts={tree_count:,} unlab pts={unlab_count:,}")
 
     # ---- manifest --------------------------------------------------------
     manifest = {}
@@ -301,11 +311,14 @@ def main():
                 f.seek(107)
                 n = struct.unpack("<I", f.read(4))[0]
             manifest[gid] = {"base": list(gbases[gid]), "points": n}
-    unlab_path = os.path.join(args.outdir, "unlabelled.laz")
-    if os.path.exists(unlab_path):
-        with open(unlab_path, "rb") as f:
+    unlab_total = 0
+    import glob as _glob
+    for up in sorted(_glob.glob(os.path.join(args.outdir, "unlabelled_*.laz"))):
+        with open(up, "rb") as f:
             f.seek(107)
-            manifest["_unlabelled"] = {"points": struct.unpack("<I", f.read(4))[0]}
+            unlab_total += struct.unpack("<I", f.read(4))[0]
+    if unlab_total:
+        manifest["_unlabelled"] = {"points": unlab_total}
     json.dump(manifest, open(os.path.join(args.outdir, "manifest.json"), "w"), indent=1)
 
     unlab_n = manifest.get("_unlabelled", {}).get("points", 0)
