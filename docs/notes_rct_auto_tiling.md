@@ -269,3 +269,46 @@ tile-sized cloud (input ply == ray cloud == segmented ply, all 4,352,543).
 Combined with the 4-tile 5x5 run (11 real trees, synthetic dup → 5 unique),
 the no-loss / no-2x guarantee is verified both at the point level and at the
 tree level on real RCT output.
+
+## Zofin_04162018_hectare34 — real 1-ha TLS sample (2026-09-24)
+
+Data: `test_runs_output/Zofin_04162018_hectare34.laz`
+(425 MB LAZ, **69,138,819 pts**, point format 1 with gps_time, all class 0).
+Extent 145.2 x 144.6 m = **1 ha**, x[-743585,-743440] y[-1202475,-1202331]
+(global EPSG-ish coords), z 774–837 m (63 m relief), density ~3,300 pts/m2,
+TLS. Converted to PLY via `laz_to_ply.py` (streaming, 69M pts → 3.3 GB).
+
+Full pipeline run (split → real RCT per tile → merge → verify):
+
+| step | result |
+| --- | --- |
+| split (L=50, B=10) | grid 3x3 = 9 tiles; **PASS** Σ nominal == input, delta 0 |
+| real RCT per tile | 9 tiles, 8.5M–26.5M pts each; ~30 min total |
+| trees per tile | 344/652/385/528/569/519/270/426/234 (**3,927 raw**) |
+| merge (δ=0.1) | **2,776 unique** from 3,927 (1,151 returned/dup collapsed) |
+| verify_point_counts | **PASS** input 69,138,819 == Σ nominal tiles (delta 0) |
+| missed-merge check | 0 duplicate bases in final output (no 2x/4x) |
+| height profile | 0–45.4 m, median 3.8 m, 208 trees > 20 m |
+
+This is the strongest end-to-end proof yet: a real 1-ha forest plot, real
+RayCloudTools on every tile, merge collapsing real duplicate detections
+across 10-m buffer overlaps, and both the point-level and tree-level no-loss
+invariants holding. 2,776 trees/ha is a plausible density for the Zofin
+mixed mountain forest.
+
+## Tile size: dynamic (plan_tiling.py)
+
+`plan_tiling.py` derives L from **density + area + RAM cap**:
+```
+L ≈ sqrt((ram_cap - overhead) * 1e9 / (bytes_per_point)) - 2*buffer
+```
+rounded down to 5 m. Tried values:
+* q34 sample (20.85M pts, ~43.5k pts/m2): L = 200 m is one tile (RAM
+  comfortable), but for tiling exercise L=5–10 m used.
+* Zofin (69M pts, ~3,300 pts/m2, 1 ha): planner says L=200 m → 1 tile
+  (whole plot fits in <13 GB RAM); full pipeline run used L=50 m → 9 tiles
+  to exercise all steps.
+Rule of thumb on MetaCentrum (RAM cap 256 GB): picks L so per-tile
+rayprocess stays under 256 GB; for ≤1 ha TLS/MLS plots the whole extent
+often fits in one tile, so tiling only kicks in above ~2–5 ha / extreme
+density. Buffer B fixed 10 m (user-set, tree crowns), overridable.
