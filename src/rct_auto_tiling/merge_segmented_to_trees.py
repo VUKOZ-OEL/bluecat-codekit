@@ -183,6 +183,8 @@ def main():
     ap.add_argument("--dup-frac", type=float, default=0.3,
                     help="shared/min(tree sizes) fraction above which two "
                          "global ids are the same physical tree")
+    ap.add_argument("--dump-shared", default=None,
+                    help="optional path to dump per-pair shared-point stats")
     args = ap.parse_args()
 
     if len(args.segmented) != len(args.trees_txt):
@@ -273,6 +275,12 @@ def main():
         if frac >= args.dup_frac:
             union(a, b)
             n_unions += 1
+    if args.dump_shared:
+        dump = [{"a": a, "b": b, "shared": c,
+                 "final_a": totals.get(a, 0), "final_b": totals.get(b, 0)}
+                for (a, b), c in sorted(shared.items(), key=lambda kv: -kv[1])]
+        json.dump(dump, open(args.dump_shared, "w"), indent=1)
+        print(f"shared-pair stats dumped to {args.dump_shared}")
     # resolve all unions: remap pt_map values to their roots
     for k in list(pt_map.keys()):
         v = pt_map[k]
