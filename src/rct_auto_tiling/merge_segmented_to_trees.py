@@ -202,7 +202,28 @@ def main():
         return (int(round(x / quant)), int(round(y / quant)), int(round(z / quant)))
 
     # ---- Pass A: key -> gid (tree wins over black) -----------------------
+    # Union-find over global tree ids: if the SAME physical point (quantized
+    # key) is part of tree A in one tile and tree B in another tile, then A
+    # and B are the SAME physical tree (duplicate detection across the tile
+    # buffer) -> union them. This is the point-proof dedup, robust where
+    # base-distance dedup (step2 delta) cannot separate real neighbours
+    # from duplicate detections of one tree.
     print("\nPass A: building global point map (key -> tree id) ...")
+    parent = {}
+    def find(a):
+        parent.setdefault(a, a)
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            # keep the LOWER id as representative for stable output
+            if ra < rb:
+                parent[rb] = ra
+            else:
+                parent[ra] = rb
     pt_map = {}  # key -> gid or -1(black)
     for ti, tj, seg, mapping in tiles:
         ds = ply_data_start(seg)
@@ -223,10 +244,20 @@ def main():
                     gid = mapping.get(lid) if lid >= 0 else None
                     k = key_of(x, y, z)
                     if gid is not None:
-                        pt_map[k] = gid            # tree wins
+                        old = pt_map.get(k)
+                        if old is not None and old >= 0 and old != gid:
+                            union(old, gid)   # same point, two trees -> same tree
+                        pt_map[k] = gid       # tree wins
                     else:
                         pt_map.setdefault(k, -1)   # first write black if unseen
         print(f"  pass A tile [{ti},{tj}] done — map size {len(pt_map):,}")
+    # resolve all unions: remap pt_map values to their roots
+    n_unions = sum(1 for v in set(pt_map.values()) if v is not None and v >= 0 and parent.get(v, v) != v)
+    for k in list(pt_map.keys()):
+        v = pt_map[k]
+        if v is not None and v >= 0:
+            pt_map[k] = find(v)
+    print(f"point-proof dedup: {n_unions} tree ids merged into shared roots")
 
     # ---- Pass B: write each point once -----------------------------------
     print("\nPass B: writing per-tree LAZ ...")
