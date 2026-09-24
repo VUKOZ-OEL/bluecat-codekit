@@ -178,6 +178,11 @@ def main():
     ap.add_argument("--outdir", required=True)
     ap.add_argument("--eps", type=float, default=0.2)
     ap.add_argument("--quant", type=float, default=0.01)
+    ap.add_argument("--min-shared", type=int, default=50,
+                    help="min shared points for a duplicate pair candidate")
+    ap.add_argument("--dup-frac", type=float, default=0.3,
+                    help="shared/min(tree sizes) fraction above which two "
+                         "global ids are the same physical tree")
     args = ap.parse_args()
 
     if len(args.segmented) != len(args.trees_txt):
@@ -202,29 +207,15 @@ def main():
         return (int(round(x / quant)), int(round(y / quant)), int(round(z / quant)))
 
     # ---- Pass A: key -> gid (tree wins over black) -----------------------
-    # Union-find over global tree ids: if the SAME physical point (quantized
-    # key) is part of tree A in one tile and tree B in another tile, then A
-    # and B are the SAME physical tree (duplicate detection across the tile
-    # buffer) -> union them. This is the point-proof dedup, robust where
-    # base-distance dedup (step2 delta) cannot separate real neighbours
-    # from duplicate detections of one tree.
+    # Point-proof duplicate detection, WEIGHTED: count how many points each
+    # pair of global tree ids shares. Two ids are the SAME physical tree only
+    # if the shared points are a substantial fraction of the smaller tree
+    # (duplicate detections of one tree share most of their points; real
+    # neighbouring trees only swap a few boundary/canopy-touch points —
+    # unioning on ANY single shared point over-merges by single-linkage).
     print("\nPass A: building global point map (key -> tree id) ...")
-    parent = {}
-    def find(a):
-        parent.setdefault(a, a)
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-    def union(a, b):
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            # keep the LOWER id as representative for stable output
-            if ra < rb:
-                parent[rb] = ra
-            else:
-                parent[ra] = rb
-    pt_map = {}  # key -> gid or -1(black)
+    shared = {}   # (min_gid, max_gid) -> shared point count
+    pt_map = {}   # key -> gid or -1(black)
     for ti, tj, seg, mapping in tiles:
         ds = ply_data_start(seg)
         with open(seg, "rb") as f:
@@ -246,18 +237,50 @@ def main():
                     if gid is not None:
                         old = pt_map.get(k)
                         if old is not None and old >= 0 and old != gid:
-                            union(old, gid)   # same point, two trees -> same tree
-                        pt_map[k] = gid       # tree wins
+                            pair = (old, gid) if old < gid else (gid, old)
+                            shared[pair] = shared.get(pair, 0) + 1
+                        pt_map[k] = gid       # tree wins (last tile for contested pts)
                     else:
                         pt_map.setdefault(k, -1)   # first write black if unseen
         print(f"  pass A tile [{ti},{tj}] done — map size {len(pt_map):,}")
+
+    # total points per gid (before any merging)
+    totals = {}
+    for v in pt_map.values():
+        if v is not None and v >= 0:
+            totals[v] = totals.get(v, 0) + 1
+
+    # union only high-overlap pairs
+    parent = {}
+    def find(a):
+        parent.setdefault(a, a)
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            if ra < rb:
+                parent[rb] = ra
+            else:
+                parent[ra] = rb
+    n_unions = 0
+    for (a, b), c in sorted(shared.items()):
+        if c < args.min_shared:
+            continue
+        frac = c / max(1, min(totals.get(a, 0), totals.get(b, 0)))
+        if frac >= args.dup_frac:
+            union(a, b)
+            n_unions += 1
     # resolve all unions: remap pt_map values to their roots
-    n_unions = sum(1 for v in set(pt_map.values()) if v is not None and v >= 0 and parent.get(v, v) != v)
     for k in list(pt_map.keys()):
         v = pt_map[k]
-        if v is not None and v >= 0:
+        if v is not None and v >= 0 and v in parent:
             pt_map[k] = find(v)
-    print(f"point-proof dedup: {n_unions} tree ids merged into shared roots")
+    print(f"point-proof dedup: {n_unions} tree-id pairs merged "
+          f"(min_shared={args.min_shared}, dup_frac={args.dup_frac}; "
+          f"{len(shared)} sharing pairs seen)")
 
     # ---- Pass B: write each point once -----------------------------------
     print("\nPass B: writing per-tree LAZ ...")
@@ -271,13 +294,16 @@ def main():
     FLUSH = 2_000_000
     tree_count = 0   # running: physical pts assigned to a tree
     unlab_count = 0  # running: physical pts with no tree anywhere
+    tree_chunks = {} # gid -> list of chunk file names (LAZ has no append)
     unlab_chunk = 0  # unlabelled_<chunk>.laz counter
+    def write_las_chunk(path, rows, colour):
+        write_las(path, [(r[0], r[1], r[2]) for r in rows], colour=colour)
     def flush_unlab(rows):
         nonlocal written, unlab_chunk
         if not rows:
             return
-        write_las(os.path.join(args.outdir, f"unlabelled_{unlab_chunk:04d}.laz"),
-                  [(r[0], r[1], r[2]) for r in rows], colour=(90, 90, 90))
+        write_las_chunk(os.path.join(args.outdir, f"unlabelled_{unlab_chunk:04d}.laz"),
+                        rows, colour=(90, 90, 90))
         written += len(rows)
         unlab_chunk += 1
     def flush(gid):
@@ -286,9 +312,34 @@ def main():
         if rows:
             # colour = per-tree colour (convertIntToColour(global id))
             cr, cg, cb = norm_colour(gid)
-            write_las(os.path.join(args.outdir, f"tree_{gid}.laz"),
-                      [(r[0], r[1], r[2]) for r in rows], colour=(cr, cg, cb))
+            n = len(tree_chunks.get(gid, []))
+            path = os.path.join(args.outdir, f"tree_{gid}.laz" if n == 0 else f"tree_{gid}_{n:03d}.laz")
+            write_las_chunk(path, rows, colour=(cr, cg, cb))
+            tree_chunks.setdefault(gid, []).append(path)
             written += len(rows)
+    def concat_tree_chunks(gid):
+        """Merge tree_<gid>_<n>.laz chunks into a single tree_<gid>.laz."""
+        chunks = sorted(tree_chunks.get(gid, []))
+        if len(chunks) <= 1:
+            if chunks and chunks[0] != os.path.join(args.outdir, f"tree_{gid}.laz"):
+                os.replace(chunks[0], os.path.join(args.outdir, f"tree_{gid}.laz"))
+            return
+        import laspy
+        import numpy as np
+        xs, ys, zs = [], [], []
+        for c in chunks:
+            with laspy.open(c) as h:
+                las = h.read()
+                xs.append(las.x); ys.append(las.y); zs.append(las.z)
+        cr, cg, cb = norm_colour(gid)
+        rows = [(float(a), float(b), float(cc)) for a, b, cc in zip(np.concatenate(xs), np.concatenate(ys), np.concatenate(zs))]
+        final = os.path.join(args.outdir, f"tree_{gid}.laz")
+        tmp = final + ".tmp.laz"
+        write_las_chunk(tmp, rows, colour=(cr, cg, cb))
+        for c in chunks:
+            if c != tmp:
+                os.remove(c)
+        os.replace(tmp, final)
     def flush_all():
         nonlocal written
         for gid in list(tree_rows):
@@ -331,6 +382,9 @@ def main():
             print(f"  pass B tile [{ti},{tj}] done (written {written:,}, skip {skip:,})")
     finally:
         flush_all()
+    # merge per-tree chunk files into single tree_<gid>.laz
+    for gid in list(tree_chunks):
+        concat_tree_chunks(gid)
     print(f"DEBUG: pt_map={len(pt_map):,} done_keys={len(done_keys):,} assigned tree pts={tree_count:,} unlab pts={unlab_count:,}")
 
     # ---- manifest --------------------------------------------------------
