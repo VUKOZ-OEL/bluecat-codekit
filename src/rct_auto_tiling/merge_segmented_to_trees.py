@@ -204,6 +204,7 @@ def main():
             write_las(os.path.join(args.outdir, f"tree_{gid}.laz"), rows)
             written += len(rows)
     def flush_all():
+        nonlocal written
         for gid in list(tree_rows):
             flush(gid)
         if unlab_rows:
