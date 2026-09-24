@@ -312,3 +312,48 @@ Rule of thumb on MetaCentrum (RAM cap 256 GB): picks L so per-tile
 rayprocess stays under 256 GB; for ≤1 ha TLS/MLS plots the whole extent
 often fits in one tile, so tiling only kicks in above ~2–5 ha / extreme
 density. Buffer B fixed 10 m (user-set, tree crowns), overridable.
+
+## Per-tree LAZ merge of segmented tiles (2026-09-24, user-driven change)
+
+User requirement: the merge output is ONE LAZ PER TREE (not one big cloud),
+with no duplicated points and no duplicated trees. A point that is
+unlabelled (terrain/black) in one tile but part of a tree in another tile
+BELONGS TO THE TREE.
+
+New script: `src/rct_auto_tiling/merge_segmented_to_trees.py`
+Inputs per tile: `tile_*_raycloud_segmented.ply` (RCT colours each tree by
+`convertIntToColour(contiguous_section_id)`, black = unlabelled), the tile's
+`trees.txt` (data-line order = the contiguous tree id used as colour), and
+the merged global treeInfo GeoJSON (step2, global ids 1..N).
+
+Key mechanics:
+- **colour = tree label**: RCT encodes the tree id bit-wise into RGB
+  (`raylib/extraction/raytrees.h: convertIntToColour`); black is -1.
+- **local -> global mapping**: per-tile local tree base (first 6-col group
+  of each trees.txt data line) snapped to the nearest global base
+  (<0.2 m). Verified 0 unmapped on all 9 Zofin tiles.
+- **two passes**: Pass A builds quantized (x,y,z)->global-tree-id map,
+  "tree wins" over black (the user's rule); Pass B writes each physical
+  point exactly once into `tree_<gid>.laz` (compressed LAZ, point format 3,
+  per-tree RGB colour) or `unlabelled_<n>.laz` chunks.
+- **point-proof duplicate-tree dedup (weighted)**: duplicate detections of
+  one tree across tile buffers whose base offsets (0.1–0.4 m) exceed
+  step2's distance delta would leave a phantom global id with no points
+  (116 of 2776 on the first full run). Pass A counts, per pair of global
+  ids, how many points they share; ids are unioned only when they share
+  >= `--min-shared` points AND >= `--dup-frac` (default 0.3) of the smaller
+  tree's points. Single-point union over-merges (987 trees) because
+  neighbouring trees swap boundary/canopy points across tiles; the
+  weighted criterion keeps real neighbours apart.
+
+Bugs found & fixed during this work:
+- step2 merge kept per-tile 1..n ids -> collided global ids (2776
+  features, only 624 unique). Now rewritten to a global 1..N sequence.
+- streaming flush of `unlabelled.laz` reopened with "wb" and silently
+  overwrote earlier chunks (point loss); now chunked into
+  `unlabelled_<n>.laz` and aggregated in manifest.json.
+- laspy 2.7 needs numpy arrays + tuple scales/offsets + LazBackend.Lazrs.
+
+Zofin full run (9 tiles, 69.1M pts): 68,946,215 unique points written
+(tree points + unlabelled), round-trip exact (pt_map == done_keys ==
+written); dedup skipped 58,738,059 duplicate tile-buffer/ray occurrences.
