@@ -53,6 +53,16 @@ def colour_to_int(r, g, b):
             res |= 1 << i
     return res - 1
 
+
+def norm_colour(i):
+    """convertIntToColour(i): bit i -> channel i%3, bit offset 7-(i//3)."""
+    ch = [0, 0, 0]
+    x = i + 1
+    for b in range(24):
+        if x & (1 << b):
+            ch[b % 3] |= 1 << (7 - (b // 3))
+    return ch[0], ch[1], ch[2]
+
 def parse_trees_txt(path):
     bases = {}
     idx = 0
@@ -98,8 +108,39 @@ def map_local_to_global(local_bases, global_bases, eps=0.2):
         mapping[lid] = best if (best is not None and bd <= max(eps, 0.05)) else None
     return mapping
 
-def write_las(path, rows):
-    """Write LAS 1.2 point-format-1 binary from rows [(x,y,z), ...]."""
+def write_las(path, rows, colour=None, gps_time=None):
+    """Write LAZ (compressed) from rows [(x,y,z), ...] via laspy. Colour is
+    (r,g,b) applied to every point (per-tree colour, convertIntToColour).
+    Falls back to LAS 1.2 binary point-format-1 when laspy/LAZ unavailable."""
+    if not rows:
+        return
+    import laspy
+    import numpy as np
+    from laspy.compression import LazBackend
+    try:
+        hdr = laspy.LasHeader(point_format=3, version="1.2")
+        hdr.scales = (0.01, 0.01, 0.01)
+        xs = np.array([r[0] for r in rows], dtype=np.float64)
+        ys = np.array([r[1] for r in rows], dtype=np.float64)
+        zs = np.array([r[2] for r in rows], dtype=np.float64)
+        hdr.offsets = (math.floor(float(xs.min())), math.floor(float(ys.min())), math.floor(float(zs.min())))
+        las = laspy.LasData(hdr)
+        las.x = xs; las.y = ys; las.z = zs
+        las.gps_time = np.array(gps_time, dtype=np.float64) if (gps_time is not None and len(gps_time) == len(rows)) else np.zeros(len(rows), dtype=np.float64)
+        if colour is not None:
+            las.red = np.full(len(rows), colour[0], dtype=np.uint16)
+            las.green = np.full(len(rows), colour[1], dtype=np.uint16)
+            las.blue = np.full(len(rows), colour[2], dtype=np.uint16)
+        las.write(path, do_compress=True, laz_backend=LazBackend.Lazrs)
+        return
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"  [warn] laspy LAZ write failed ({e}); writing LAS 1.2 binary")
+        _write_las_raw(path, rows)
+
+def _write_las_raw(path, rows):
+    """Fallback: LAS 1.2 binary point-format-1 (no compression) from rows."""
     if not rows:
         return
     n = len(rows)
@@ -190,7 +231,7 @@ def main():
     # ---- Pass B: write each point once -----------------------------------
     print("\nPass B: writing per-tree LAZ ...")
     # buffer per tree to limit file handles
-    tree_rows = {}   # gid -> list[(x,y,z)]
+    tree_rows = {}   # gid -> list[(x,y,z,r,g,b)]
     unlab_rows = []
     written = 0
     skip = 0
@@ -201,14 +242,18 @@ def main():
         nonlocal written
         rows = tree_rows.pop(gid, [])
         if rows:
-            write_las(os.path.join(args.outdir, f"tree_{gid}.laz"), rows)
+            # colour = per-tree colour (convertIntToColour(global id))
+            cr, cg, cb = norm_colour(gid)
+            write_las(os.path.join(args.outdir, f"tree_{gid}.laz"),
+                      [(r[0], r[1], r[2]) for r in rows], colour=(cr, cg, cb))
             written += len(rows)
     def flush_all():
         nonlocal written
         for gid in list(tree_rows):
             flush(gid)
         if unlab_rows:
-            write_las(os.path.join(args.outdir, "unlabelled.laz"), unlab_rows)
+            write_las(os.path.join(args.outdir, "unlabelled.laz"),
+                      [(r[0], r[1], r[2]) for r in unlab_rows], colour=(90, 90, 90))
         written += len(unlab_rows)
 
     try:
@@ -239,7 +284,9 @@ def main():
                         else:
                             unlab_rows.append((x, y, z))
                             if len(unlab_rows) >= FLUSH:
-                                write_las(os.path.join(args.outdir, "unlabelled.laz"), unlab_rows)
+                                write_las(os.path.join(args.outdir, "unlabelled.laz"),
+                                          [(r[0], r[1], r[2]) for r in unlab_rows],
+                                          colour=(90, 90, 90))
                                 unlab_rows = []
             print(f"  pass B tile [{ti},{tj}] done (written {written:,}, skip {skip:,})")
     finally:
