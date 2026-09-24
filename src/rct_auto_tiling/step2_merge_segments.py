@@ -20,7 +20,7 @@ neighbour buckets. O(N) average. The surviving feature = detection with fewest
 missing properties / most points; coordinates = the group's representative.
 """
 from __future__ import annotations
-import argparse, glob, json, math, os, sys
+import argparse, copy, glob, json, math, os, sys
 from typing import Dict, List, Tuple
 
 DELTA_DEFAULT = 0.1
@@ -95,13 +95,20 @@ def single_linkage(dets: List[Dict], delta: float) -> List[List[Dict]]:
 def merge(dets: List[Dict], delta: float) -> List[Dict]:
     groups = single_linkage(dets, delta)
     features = []
-    for g in groups:
+    for gid, g in enumerate(groups, start=1):
         if len(g) > 1:
             # representative = group centroid? keep base of detection with fewest missing; coords = first
             best = min(g, key=lambda d: (d["missing"], -d["npoints"]))
         else:
             best = g[0]
-        features.append(best["feat"])
+        feat = copy.deepcopy(best["feat"])
+        # GLOBAL unique id — the per-tile id (1..n per tile) collides across
+        # tiles, so rewrite it to a single global 1..N sequence. This id is
+        # what ties per-tile detection colour labels together after merge.
+        feat["id"] = gid
+        props = feat.setdefault("properties", {})
+        props["tree_id"] = gid
+        features.append(feat)
     print(f"unique trees = {len(features)}  (raw detections = {len(dets)}, collapsed = {len(dets) - len(features)})")
     return features
 
