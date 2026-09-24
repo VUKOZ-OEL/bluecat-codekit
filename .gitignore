@@ -34,6 +34,9 @@ test_runs_output/
 test_runs_outputs/
 results/
 
+# Disposable scratch — never a dependency of finished work (AGENTS.md §6)
+working/
+
 # Python caches
 __pycache__/
 *.pyc
