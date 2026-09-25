@@ -95,7 +95,9 @@ def norm_colour(i: int):
 
 def write_laz(path, x, y, z, t=None, colour=None):
     import laspy
-    las = laspy.create(point_format=3, file_version="1.2")
+    n = len(np.asarray(x))
+    version = "1.4" if n > (1 << 32) - 2 else "1.2"
+    las = laspy.create(point_format=3, file_version=version)
     las.x = np.asarray(x, dtype=np.float64)
     las.y = np.asarray(y, dtype=np.float64)
     las.z = np.asarray(z, dtype=np.float64)
@@ -270,12 +272,10 @@ def main() -> int:
         if len(live) > 200 and g % 200 == 0:
             print(f"  wrote tree {g} ...", flush=True)
     ul = np.where(assigned < 0)[0]
-    chunks = 0
-    for k in range(0, len(ul), FLUSH):
-        m = ul[k:k + FLUSH]
-        write_laz(os.path.join(args.outdir, f"unlabelled_{chunks:04d}.laz"), X[m], Y[m], Z[m], T[m])
-        chunks += 1
-    manifest["_unlabelled"] = {"points": int(len(ul)), "chunks": chunks}
+    # ONE unlabelled cloud for the whole plot (LAS 1.4 if > 4.29e9 pts)
+    write_laz(os.path.join(args.outdir, "unlabelled.laz"),
+              X[ul], Y[ul], Z[ul], T[ul])
+    manifest["_unlabelled"] = {"points": int(len(ul))}
     with open(os.path.join(args.outdir, "manifest.json"), "w") as f:
         json.dump(manifest, f)
     total = written + len(ul)
