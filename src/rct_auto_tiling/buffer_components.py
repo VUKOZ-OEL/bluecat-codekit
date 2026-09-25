@@ -97,6 +97,12 @@ def main() -> int:
     ap.add_argument("--tiles", nargs="+", required=True,
                     help="tile PLYs (tile_i_j.ply with .rids sidecar; RCT outputs beside them)")
     ap.add_argument("--outdir", required=True)
+    ap.add_argument("--min-shared", type=int, default=1000,
+                    help="min shared records for a segment pair to link")
+    ap.add_argument("--dup-frac", type=float, default=0.5,
+                    help="shared / smaller-segment-size fraction required to "
+                         "link (true duplicates cover ~all of the small piece; "
+                         "0 disables the fraction test)")
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
 
@@ -135,26 +141,63 @@ def main() -> int:
 
     # ---- segment linkage graph -------------------------------------------
     N = inp_hdr_rows
+    SHIFT_ = SHIFT
+    # node sizes (coloured records per segment)
+    seg_size: dict = {}
+    for tidx in range(len(seg_tiles)):
+        lab = seg_lab[tidx]
+        for c in np.unique(lab[lab >= 0]):
+            seg_size[(tidx << SHIFT_) | int(c)] = int((lab == c).sum())
+    # pairwise shared-record counts (vectorised: sort the shared (a,b) node
+    # pairs and count unique composite keys)
     first_owner = np.full(N, -1, dtype=np.int32)   # first node colouring record r
-    eu, ev = [], []
+    all_prev, all_node = [], []
     for tidx in range(len(seg_tiles)):
         lab = seg_lab[tidx]
         m = np.where(lab >= 0)[0]
         if m.size == 0:
             continue
         recs = seg_rids[tidx][m]
-        nodes = (np.int32(tidx) << SHIFT) | lab[m].astype(np.int32)
+        nodes = (np.int32(tidx) << SHIFT_) | lab[m].astype(np.int32)
         prev = first_owner[recs]
         fresh = prev < 0
         first_owner[recs[fresh]] = nodes[fresh]
         sh = ~fresh
         if sh.any():
-            eu.append(prev[sh]); ev.append(nodes[sh])
-    if eu:
-        eu = np.concatenate(eu); ev = np.concatenate(ev)
+            all_prev.append(prev[sh]); all_node.append(nodes[sh])
+    if all_prev:
+        A = np.concatenate(all_prev).astype(np.int64)
+        B_ = np.concatenate(all_node).astype(np.int64)
+        lo = np.minimum(A, B_); hi = np.maximum(A, B_)
+        pk = (lo << np.int64(32)) + hi
+        uk, uc = np.unique(pk, return_counts=True)
+        pair_a = uk >> np.int64(32)
+        pair_b = uk - (pair_a << np.int64(32))
+        pair_cnt = list(zip(pair_a.tolist(), pair_b.tolist(), uc.tolist()))
     else:
-        eu = ev = np.empty(0, dtype=np.int32)
-    print(f"shared-record directed edges: {len(eu):,}", flush=True)
+        pair_cnt = []
+    print(f"shared-record distinct pairs: {len(pair_cnt):,}", flush=True)
+    # weighted link: enough shared points AND good coverage of the smaller
+    # segment (a true cross-boundary duplicate covers nearly all of its
+    # smaller piece; neighbour trees only trade a few boundary points)
+    eu, ev = [], []
+    hist_hi = []
+    for a, b, c in pair_cnt:
+        msize = min(seg_size[a], seg_size[b])
+        frac = c / max(1, msize)
+        if c >= args.min_shared:
+            hist_hi.append(frac)
+            if args.dup_frac <= 0 or frac >= args.dup_frac:
+                eu.append(a); ev.append(b)
+    eu = np.asarray(eu, dtype=np.int32); ev = np.asarray(ev, dtype=np.int32)
+    if hist_hi and os.environ.get("COMP_STATS"):
+        fs = sorted(hist_hi)
+        print("PAIR frac histogram (>=min_shared):", flush=True)
+        for lo_ in (0, .02, .05, .1, .2, .3, .5, .7, .9, .99):
+            hi_ = {0: .02, .02: .05, .05: .1, .1: .2, .2: .3, .3: .5, .5: .7, .7: .9, .9: .99, .99: 1.01}[lo_]
+            n = sum(1 for f in fs if lo_ <= f < hi_)
+            print(f"  [{lo_:.2f},{hi_:.2f}): {n}", flush=True)
+    print(f"linked pairs: {len(eu):,} (min_shared={args.min_shared}, dup_frac={args.dup_frac})", flush=True)
 
     allnodes = np.unique(np.concatenate([
         (np.int32(t) << SHIFT) | np.unique(lab[lab >= 0])
