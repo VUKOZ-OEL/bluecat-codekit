@@ -122,6 +122,9 @@ def main() -> int:
     writers = [open(os.path.join(args.outdir, f"{args.prefix}_{i}_{j}.ply"), "wb") for (i, j) in keys]
     for w, k in zip(writers, keys):
         w.write(PLY_HEADER_TMPL.format(n=0).encode())
+    # row-id sidecars: global input row index per tile output row (exact
+    # record identity for the seamless assembly; RCT preserves row order)
+    rid_lists = [[] for _ in keys]
     # owner count files (per tile: how many of ITS OWN nominal points it holds)
     owner_files = [open(os.path.join(args.outdir, f"{args.prefix}_{i}_{j}.owners.json"), "w")
                    for (i, j) in keys]
@@ -131,6 +134,7 @@ def main() -> int:
     written = np.zeros(len(keys), dtype=np.int64)
     n_written = 0
     t2 = time.time()
+    row0 = 0  # global input row index of the first record in the current chunk
     with open(args.input, "rb") as f:
         f.seek(hdr_bytes)
         while True:
@@ -144,6 +148,8 @@ def main() -> int:
             arr = np.frombuffer(buf, dtype=DT, count=len(buf)//RECORD)
             if arr.size == 0:
                 continue
+            rows = np.arange(row0, row0 + arr.size, dtype=np.int64)
+            row0 += arr.size
             x = arr["x"]; y = arr["y"]
             ci = np.floor((x - ox) / L).astype(np.int64)
             cj = np.floor((y - oy) / L).astype(np.int64)
@@ -162,8 +168,10 @@ def main() -> int:
                         continue
                     fi = (ix - i0) * (j1 - j0) + (jy - j0)
                     for u in np.unique(fi[m]):
-                        sel = arr[m & (fi == u)]
+                        keepm = m & (fi == u)
+                        sel = arr[keepm]
                         writers[u].write(sel.tobytes())
+                        rid_lists[u].append(rows[keepm])
                         written[u] += sel.size
                         n_written += sel.size
             # nominal counts
@@ -179,6 +187,9 @@ def main() -> int:
         w.seek(0)
         w.write(PLY_HEADER_TMPL.format(n=int(written[u])).encode())
         w.close()
+        np.concatenate(rid_lists[u]).tofile(
+            os.path.join(args.outdir, f"{args.prefix}_{keys[u][0]}_{keys[u][1]}.ply.rids"))
+        rid_lists[u] = None
         json.dump({"owner": int(counts[u]), "in_file": int(written[u]),
                    "prefix": args.prefix, "i": keys[u][0], "j": keys[u][1]}, owner_files[u])
         owner_files[u].close()
