@@ -371,3 +371,46 @@ pairs (>100k shared points) all have base distances 0.1–0.7 m; pairs
 metres apart are canopy-contact chains and must NOT be unioned. Defaults:
 `--min-shared 50`, `--dup-frac 0.05` (over the sum of both sizes),
 `--base-max 1.0` m.
+
+## Seamless whole-plot assembly (2026-09-25, user-driven redesign)
+
+User requirements: ONE unlabelled cloud for the whole plot; buffer shrunk
+to 1 m; segments whose points appear in a neighbour's buffer merged,
+de-duplicated at point level and RE-SEGMENTED once more by RCT against a
+single seam-free terrain model; output = seamless segmentation of the
+whole plot with the hard invariant N_input == sum(tree pts) + unlabelled.
+
+Why the old approach was replaced: with B=10 the buffer copies were huge
+(69.1M input -> 127.7M buffered pts) and the base/point dedup had to undo
+what the big buffer created; boundary trees kept two partial RCT answers.
+
+Key identity discovery: RCT rewrites the `time` column but preserves ROW
+ORDER and xyz, and the input cloud has 192k exact-xyz duplicate triples
+(xyzt is unique). So record identity rides on `<tile>.ply.rids` sidecars
+written by step1 (global input row of every tile row), never on float
+keys.
+
+Pipeline (`run_seamless.sh`, B=1):
+ 1. step1_tile_split -> tiles + .rids + grid.json
+ 2. per tile: rayimport -> rayextract terrain -> trees
+ 3. stitch_terrain.py — weld per-tile terrain meshes on the shared world
+    grid (z averaged, duplicate triangles dropped): 9 Zofin meshes
+    6.74M verts/13.48M faces -> 3.85M/7.79M, one seamless mesh.
+ 4. buffer_components.py — segment graph nodes = (tile, RCT colour);
+    link two segments iff they share >= min_shared records AND >=
+    dup_frac of the smaller piece (touching canopies trade a handful of
+    points: B=10 smoke run had 42.9M shared occurrences over 6084 pairs,
+    any-share linking chained 2704 trees into one 40M mega-component;
+    weighted defaults 1000/0.5 give 677 sane components, max 1.42M pts).
+    Components exported with .rids; single-segment trees need no re-run.
+ 5. per component: rayimport + rayextract trees comp.ply
+    terrain_stitched.ply (seamless standalone re-segmentation).
+ 6. merge_final.py — priority assign EVERY input record: re-segmented
+    component (black inside a component joins its largest segment) >
+    tile segment > unlabelled; base-dedup (delta) only for zero-shared
+    whole-tree duplicates; per-tree LAZ with RGB + ONE unlabelled.laz
+    (LAS 1.4 auto when > 4.29e9). Invariant checked and enforced
+    (exit 2 on mismatch).
+
+Old per-tree output remained valid for its parameters (B=10, no
+re-segmentation); the seamless run supersedes it once executed.
