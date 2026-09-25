@@ -185,6 +185,12 @@ def main() -> int:
 
     nominal_sum = int(counts.sum())
     print(f"nominal sum = {nominal_sum} | input = {n_total} | delta = {nominal_sum - n_total} | buffered total = {n_written}", flush=True)
+    # grid metadata for downstream seamless steps (buffer-zone detection,
+    # component building): origin, cell length, buffer, grid extent
+    with open(os.path.join(args.outdir, "grid.json"), "w") as gf:
+        json.dump({"origin_x": ox, "origin_y": oy, "length": L, "buffer": B,
+                   "i0": i0, "i1": i1, "j0": j0, "j1": j1,
+                   "input_points": int(n_total), "input": os.path.abspath(args.input)}, gf)
     if nominal_sum != n_total:
         print("FAIL: nominal sum != input — partition not watertight", flush=True)
         return 2
