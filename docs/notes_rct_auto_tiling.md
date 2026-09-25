@@ -414,3 +414,19 @@ Pipeline (`run_seamless.sh`, B=1):
 
 Old per-tree output remained valid for its parameters (B=10, no
 re-segmentation); the seamless run supersedes it once executed.
+
+**Zofin seamless run executed (B=1, L=50, 9 tiles):** split 69,138,819
+pts (buffered 89.5M vs 127.7M at B=10); per-tile RCT -> 2,323 segments;
+stitched terrain 9 meshes -> one 3.85M-vert mesh; buffer_components with
+defaults (min_shared=1000, dup_frac=0.5) linked only 85 pairs -> **72
+multi-tile components** (at B=10 it was 677 - the 1 m buffer does its
+job); all 72 re-segmented by RCT against the stitched mesh; merge_final
+with delta=0.5 collapsed a further 202 zero-shared base duplicates.
+FINAL: **2,047 trees, 50,510,741 tree pts + 18,628,078 in ONE
+unlabelled.laz = 69,138,819 == input, PASS by independent laspy
+read-back.** Biggest tree 958k pts / 24 m crown / 36.6 m tall — no
+mega-merges. 1-point trees (RCT speckles) kept: removing them would
+break the point invariant; filter via manifest if desired.
+Pitfalls fixed en route: `tile_*.ply` globs must exclude
+`tile_*_raycloud.ply` intermediates (strict regex), docker mounts need
+absolute Windows paths, run_seamless.sh now resolves them itself.
