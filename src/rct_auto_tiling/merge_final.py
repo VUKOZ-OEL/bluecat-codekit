@@ -192,8 +192,12 @@ def main() -> int:
     print(f"components assembled: {ncomp:,}", flush=True)
 
     # ---- 2) single-tile segments --------------------------------------------
+    import re as _re
+    tile_pat = _re.compile(r"^tile_(\d+)_(\d+)\.ply$")
     nseg = 0
     for tp in args.tiles:
+        if not tile_pat.match(os.path.basename(tp)):
+            continue  # ignore RCT intermediates matched by a loose glob
         i, j = tile_ij(tp)
         rid = np.fromfile(tp + ".rids", dtype=np.int64)
         segp = os.path.join(os.path.dirname(tp), os.path.basename(tp)[:-4] + "_raycloud_segmented.ply")

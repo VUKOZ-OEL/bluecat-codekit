@@ -21,9 +21,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && cygpath -m "$(pwd)")"
 SRC="$ROOT/src/rct_auto_tiling"
 
 INPUT="${1:?usage: run_seamless.sh <input.ply> [length=10] [buffer=1] [outdir]}"
+INPUT="$(cygpath -m "$(realpath "$INPUT")")"
 LENGTH="${2:-10}"
 BUFFER="${3:-1}"
-OUT="${4:-$ROOT/test_runs_output/seamless_run}"
+OUT="$(cygpath -m "$(mkdir -p "${4:-$ROOT/test_runs_output/seamless_run}" && realpath "${4:-$ROOT/test_runs_output/seamless_run}")")"
 TILE_DIR="$OUT/tiles"
 COMP_DIR="$OUT/comps"
 mkdir -p "$TILE_DIR" "$COMP_DIR"
@@ -60,6 +61,13 @@ if [ "${RCT_DOCKER:-0}" = "1" ]; then
     cp "$OUT/terrain_stitched.ply" "$COMP_DIR/"
     for cf in "$COMP_DIR"/comp_*.ply; do
         base="$(basename "$cf" .ply)"
+        case "$base" in
+            comp_[0-9]*) ;;
+            *) continue ;;   # skip comp_*_raycloud intermediates
+        esac
+        case "$base" in
+            *_raycloud) continue ;;
+        esac
         [ -f "$COMP_DIR/${base}_raycloud_segmented.ply" ] && continue
         run_rct_docker "$COMP_DIR" \
             "rayimport $base.ply 0,0,0 && rayextract trees ${base}_raycloud.ply terrain_stitched.ply"

@@ -113,9 +113,14 @@ def main() -> int:
     seg_rids = []           # per tile: int64 global record id per row
     seg_lab = []            # per tile: int32 colour id per record (-1 black)
     tile_paths = []
+    import re as _re
+    tile_pat = _re.compile(r"^tile_(\d+)_(\d+)\.ply$")
     for tp in args.tiles:
         base = os.path.basename(tp)
-        i, j = int(base[:-4].split("_")[1]), int(base[:-4].split("_")[2])
+        mm = tile_pat.match(base)
+        if not mm:
+            continue  # ignore RCT intermediates matched by a loose glob
+        i, j = int(mm.group(1)), int(mm.group(2))
         ridp = tp + ".rids"
         if not os.path.exists(ridp):
             sys.exit(f"missing row-id sidecar {ridp} (re-run step1_tile_split.py)")
