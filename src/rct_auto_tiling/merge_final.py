@@ -249,12 +249,12 @@ def main() -> int:
                 if math.dist((trees[a]["x"], trees[a]["y"]), (trees[b]["x"], trees[b]["y"])) <= args.delta:
                     uni(a, b)
                     merged += 1
-    remap = 0
-    for g in list(trees):
-        r = fnd(g)
-        if r != g:
-            assigned[assigned == g] = r
-            remap += 1
+    # apply DSU as one vectorised lookup (no per-tree scans over N)
+    lut = np.arange(len(trees), dtype=np.int32)
+    for g in trees:
+        lut[g] = fnd(g)
+    assigned = np.where(assigned >= 0, lut[np.clip(assigned, 0, None)].astype(np.int32), -1)
+    remap = int((np.array([lut[g] != g for g in trees])).sum())
     print(f"base-dedup: {merged} links, {remap} trees collapsed (delta={args.delta} m)", flush=True)
 
     # ---- 4) write -----------------------------------------------------------
@@ -263,14 +263,22 @@ def main() -> int:
     X = np.asarray(inp["x"]); Y = np.asarray(inp["y"]); Z = np.asarray(inp["z"]); T = np.asarray(inp["t"])
     manifest = {}
     written = 0
-    for g in live:
-        m = np.where(assigned == g)[0]
+    # group records once: sort by gid, then contiguous slices
+    valid = np.where(assigned >= 0)[0]
+    order = valid[np.argsort(assigned[valid], kind="stable")]
+    gsorted = assigned[order]
+    bounds = np.flatnonzero(np.diff(gsorted)) + 1
+    starts = np.concatenate([[0], bounds])
+    ends = np.concatenate([bounds, [len(gsorted)]])
+    for si, (s, e) in enumerate(zip(starts, ends)):
+        g = int(gsorted[s])
+        m = order[s:e]
         write_laz(os.path.join(args.outdir, f"tree_{g}.laz"), X[m], Y[m], Z[m], T[m], norm_colour(g))
-        manifest[str(g)] = {"points": int(len(m)), "source": trees[g]["source"],
+        manifest[str(g)] = {"points": int(e - s), "source": trees[g]["source"],
                             "x": trees[g]["x"], "y": trees[g]["y"], "z": trees[g]["z"]}
-        written += len(m)
-        if len(live) > 200 and g % 200 == 0:
-            print(f"  wrote tree {g} ...", flush=True)
+        written += e - s
+        if si % 200 == 0:
+            print(f"  trees written: {si:,} ({written:,} pts)", flush=True)
     ul = np.where(assigned < 0)[0]
     # ONE unlabelled cloud for the whole plot (LAS 1.4 if > 4.29e9 pts)
     write_laz(os.path.join(args.outdir, "unlabelled.laz"),
