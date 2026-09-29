@@ -100,7 +100,7 @@ def main() -> int:
     ap.add_argument("--min-shared", type=int, default=1,
                     help="min shared records to consider linking (recall-first: "
                          "a false join costs compute, a missed join costs a cut tree)")
-    ap.add_argument("--dup-frac", type=float, default=0.1,
+    ap.add_argument("--dup-frac", type=float, default=0.05,
                     help="shared / smaller-overlap-zone fraction required to link "
                          "(of coloured records inside the B m tile band). Universal "
                          "across point densities since overlap zone scales with B.")
