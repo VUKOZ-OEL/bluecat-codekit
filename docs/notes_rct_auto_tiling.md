@@ -430,3 +430,20 @@ break the point invariant; filter via manifest if desired.
 Pitfalls fixed en route: `tile_*.ply` globs must exclude
 `tile_*_raycloud.ply` intermediates (strict regex), docker mounts need
 absolute Windows paths, run_seamless.sh now resolves them itself.
+
+## Reference validation A+B (2026-09-25)
+
+Whole-plot RCT reference run on `zofin.ply` (segmentation WITHOUT tiling):
+2,204 trees, 50,835,128 tree pts + 18,303,691 unlabelled = 69,138,819
+(exact). Output: `autotiling_test/zofin/reference/trees_ref/tree_*.laz`.
+
+Comparison tiled B=1/L=50 (`seamless_zofin/trees_out`, 2,047 trees)
+against the whole-plot reference (2,204 trees):
+* A — hard invariant: tiled output 50,510,741 + 18,628,078 ==
+  input 69,138,819 PASS (verified by laspy read-back).
+* B — base positions (KDTree nearest): reference→tiled 2,157/2,204 =
+  97.9% within 2 m; tiled→reference 1,953/2,047 = 95.4% within 2 m.
+  Both >= 95% acceptance bar. The remaining ~2% are base-position
+  disagreements inherent to per-tile RCT (different trunk base fit),
+  not merge failures — the mega-merge failure mode is absent (max
+  crown diag 24 m).
