@@ -97,21 +97,28 @@ def main() -> int:
     ap.add_argument("--tiles", nargs="+", required=True,
                     help="tile PLYs (tile_i_j.ply with .rids sidecar; RCT outputs beside them)")
     ap.add_argument("--outdir", required=True)
-    ap.add_argument("--min-shared", type=int, default=1000,
-                    help="min shared records for a segment pair to link")
-    ap.add_argument("--dup-frac", type=float, default=0.5,
-                    help="shared / smaller-segment-size fraction required to "
-                         "link (true duplicates cover ~all of the small piece; "
-                         "0 disables the fraction test)")
+    ap.add_argument("--min-shared", type=int, default=1,
+                    help="min shared records to consider linking (recall-first: "
+                         "a false join costs compute, a missed join costs a cut tree)")
+    ap.add_argument("--dup-frac", type=float, default=0.1,
+                    help="shared / smaller-overlap-zone fraction required to link "
+                         "(of coloured records inside the B m tile band). Universal "
+                         "across point densities since overlap zone scales with B.")
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
 
     inp_hdr_rows = n_vertex_count(args.input)
     print(f"input records: {inp_hdr_rows:,}", flush=True)
 
+    # grid geometry (needed for the overlap strip of each tile)
+    from json import load as _jl
+    _g = _jl(open(os.path.join(os.path.dirname(args.tiles[0]), 'grid.json')))
+    OX, OY, L_, B_ = _g['origin_x'], _g['origin_y'], _g['length'], _g['buffer']
+
     seg_tiles = []          # list of (i,j) in --tiles order
     seg_rids = []           # per tile: int64 global record id per row
     seg_lab = []            # per tile: int32 colour id per record (-1 black)
+    seg_inband = []         # per tile: bool mask - record inside the 1 m band
     tile_paths = []
     import re as _re
     tile_pat = _re.compile(r"^tile_(\d+)_(\d+)\.ply$")
@@ -140,19 +147,29 @@ def main() -> int:
                and np.array_equal(np.asarray(segm["x"]), np.asarray(tile["x"]))):
             sys.exit(f"tile {i},{j}: RCT reordered rows - .rids mapping invalid")
         lab = colour_ids(np.asarray(segm["rgba"]))
+        x = np.asarray(tile["x"]); y = np.asarray(tile["y"])
+        xlo, xhi = OX + i * L_, OX + (i + 1) * L_
+        ylo, yhi = OY + j * L_, OY + (j + 1) * L_
+        # inside per-tile overlap (buffer) band along ANY nominal edge
+        band = (x < (xlo + B_)) | (x >= (xhi - B_)) | (y < (ylo + B_)) | (y >= (yhi - B_))
         seg_tiles.append((i, j)); tile_paths.append(tp)
-        seg_rids.append(rid); seg_lab.append(lab)
-        print(f"  tile {i},{j}: {len(tile):,} pts, {int((lab >= 0).sum()):,} coloured", flush=True)
+        seg_rids.append(rid); seg_lab.append(lab); seg_inband.append(band)
+        print(f"  tile {i},{j}: {len(tile):,} pts, {int((lab >= 0).sum()):,} coloured, "
+              f"{int(band.sum()):,} in 1m band", flush=True)
 
     # ---- segment linkage graph -------------------------------------------
     N = inp_hdr_rows
     SHIFT_ = SHIFT
-    # node sizes (coloured records per segment)
+    # node sizes (coloured records per segment) + overlap-zone sizes
     seg_size: dict = {}
+    seg_overlap: dict = {}
     for tidx in range(len(seg_tiles)):
-        lab = seg_lab[tidx]
+        lab = seg_lab[tidx]; band = seg_inband[tidx]
         for c in np.unique(lab[lab >= 0]):
-            seg_size[(tidx << SHIFT_) | int(c)] = int((lab == c).sum())
+            node = (tidx << SHIFT_) | int(c)
+            sel = lab == c
+            seg_size[node] = int(sel.sum())
+            seg_overlap[node] = int((sel & band).sum())
     # pairwise shared-record counts (vectorised: sort the shared (a,b) node
     # pairs and count unique composite keys)
     first_owner = np.full(N, -1, dtype=np.int32)   # first node colouring record r
@@ -182,27 +199,32 @@ def main() -> int:
     else:
         pair_cnt = []
     print(f"shared-record distinct pairs: {len(pair_cnt):,}", flush=True)
-    # weighted link: enough shared points AND good coverage of the smaller
-    # segment (a true cross-boundary duplicate covers nearly all of its
-    # smaller piece; neighbour trees only trade a few boundary points)
+    # UNIVERSAL recall-first rule (user: re-segmentation of a joined component
+    # is cheap; a missed join is an expensive manual fix):
+    #   link if shared > 0 AND shared >= dup_frac * min(overlap-zone sizes)
+    # where overlap-zone = coloured records of each segment inside its own
+    # tile's B m buffer band. A true cross-seam duplicate covers nearly all
+    # of its overlap band; touching crowns of different trees share only a
+    # few scattered band points.
     eu, ev = [], []
     hist_hi = []
     for a, b, c in pair_cnt:
-        msize = min(seg_size[a], seg_size[b])
-        frac = c / max(1, msize)
-        if c >= args.min_shared:
-            hist_hi.append(frac)
-            if args.dup_frac <= 0 or frac >= args.dup_frac:
-                eu.append(a); ev.append(b)
+        mz_a = seg_overlap.get(a, 0); mz_b = seg_overlap.get(b, 0)
+        mz_min = min(mz_a, mz_b)
+        frac = c / max(1, mz_min)
+        hist_hi.append(frac)
+        if c >= args.min_shared and frac >= args.dup_frac:
+            eu.append(a); ev.append(b)
     eu = np.asarray(eu, dtype=np.int32); ev = np.asarray(ev, dtype=np.int32)
     if hist_hi and os.environ.get("COMP_STATS"):
         fs = sorted(hist_hi)
-        print("PAIR frac histogram (>=min_shared):", flush=True)
+        print("PAIR frac histogram (vs overlap):", flush=True)
         for lo_ in (0, .02, .05, .1, .2, .3, .5, .7, .9, .99):
             hi_ = {0: .02, .02: .05, .05: .1, .1: .2, .2: .3, .3: .5, .5: .7, .7: .9, .9: .99, .99: 1.01}[lo_]
             n = sum(1 for f in fs if lo_ <= f < hi_)
             print(f"  [{lo_:.2f},{hi_:.2f}): {n}", flush=True)
-    print(f"linked pairs: {len(eu):,} (min_shared={args.min_shared}, dup_frac={args.dup_frac})", flush=True)
+    print(f"linked pairs: {len(eu):,} (min_shared={args.min_shared}, dup_frac={args.dup_frac}, "
+          f"norm=overlap-zone)", flush=True)
 
     allnodes = np.unique(np.concatenate([
         (np.int32(t) << SHIFT) | np.unique(lab[lab >= 0])
